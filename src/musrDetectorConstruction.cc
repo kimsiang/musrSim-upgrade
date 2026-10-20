@@ -103,6 +103,25 @@ musrDetectorConstruction::~musrDetectorConstruction()
 //....oooOO0OOooo........oooOO0OOooo........oooOO0OOooo........oooOO0OOooo......
 
 #include "G4LogicalVolumeStore.hh"
+#include "G4Version.hh"
+
+// Geant4 11 renamed the two-component scintillation properties; translate the
+// old (Geant4 10) names used in steering files so that old macros keep working.
+static G4String G4OpticalPropertyName(const char* name) {
+#if G4VERSION_NUMBER >= 1100
+	static const std::map<std::string,std::string> renamed = {
+		{"FASTCOMPONENT",             "SCINTILLATIONCOMPONENT1"},
+		{"SLOWCOMPONENT",             "SCINTILLATIONCOMPONENT2"},
+		{"FASTTIMECONSTANT",          "SCINTILLATIONTIMECONSTANT1"},
+		{"SLOWTIMECONSTANT",          "SCINTILLATIONTIMECONSTANT2"},
+		{"FASTSCINTILLATIONRISETIME", "SCINTILLATIONRISETIME1"},
+		{"SLOWSCINTILLATIONRISETIME", "SCINTILLATIONRISETIME2"}};
+	auto it = renamed.find(name);
+	if (it != renamed.end()) return it->second;
+#endif
+	return name;
+}
+
 G4VPhysicalVolume* musrDetectorConstruction::Construct()  {
 	// Clean old geometry, if any
 	//
@@ -1170,7 +1189,14 @@ G4VPhysicalVolume* musrDetectorConstruction::Construct()  {
 						if (strcmp(parameterName,"SetDeltaIntersection")==0){ fieldMgr->SetDeltaIntersection(parameterValue*CLHEP::mm); }
 						else if (strcmp(parameterName,"SetDeltaOneStep")==0){ fieldMgr->SetDeltaOneStep(parameterValue*CLHEP::mm); }
 						else if (strcmp(parameterName,"SetMinimumEpsilonStep")==0){ fieldMgr->SetMinimumEpsilonStep(parameterValue); }
-						else if (strcmp(parameterName,"SetMaximumEpsilonStep")==0){ fieldMgr->SetMaximumEpsilonStep(parameterValue); }
+						else if (strcmp(parameterName,"SetMaximumEpsilonStep")==0){
+							// Geant4 >= 11 aborts if eps_max > 0.01, so clamp it
+							if (parameterValue > 0.01) {
+								G4cout<<"musrDetectorConstruction: SetMaximumEpsilonStep "<<parameterValue<<" > 0.01 (Geant4 limit); using 0.01"<<G4endl;
+								parameterValue = 0.01;
+							}
+							fieldMgr->SetMaximumEpsilonStep(parameterValue);
+						}
 						else if (strcmp(parameterName,"SetLargestAcceptableStep")==0) { propagMgr->SetLargestAcceptableStep(parameterValue*CLHEP::mm); }
 						else if (strcmp(parameterName,"SetMaxLoopCount")==0) {propagMgr->SetMaxLoopCount(int(parameterValue)); }
 						else {
@@ -1862,7 +1888,14 @@ G4VPhysicalVolume* musrDetectorConstruction::Construct()  {
 							if (nEntries==0) {  // AddConstProperty
 								double value;
 								sscanf(&line[0],"%*s %*s %*s %*s %*d %lf",&value);
-								MPT_tmp->AddConstProperty(propertyName,value);
+								if (strcmp(propertyName,"YIELDRATIO")==0 && G4VERSION_NUMBER>=1100) {
+									// Geant4 11: YIELDRATIO r  ->  relative yields r (component 1) and 1-r (component 2)
+									MPT_tmp->AddConstProperty("SCINTILLATIONYIELD1",value);
+									MPT_tmp->AddConstProperty("SCINTILLATIONYIELD2",1.-value);
+								}
+								else {
+									MPT_tmp->AddConstProperty(G4OpticalPropertyName(propertyName),value);
+								}
 								if ( (strcmp(propertyName,"FASTSCINTILLATIONRISETIME")==0) || (strcmp(propertyName,"SLOWSCINTILLATIONRISETIME")==0) ) {
 									if (value!=0) {
 										musrParameters::finiteRiseTimeInScintillator = true;
@@ -1886,7 +1919,7 @@ G4VPhysicalVolume* musrDetectorConstruction::Construct()  {
 									valueArray[i]=value;
 									sscanf(pch,"%s",dummy); char* pch2=strstr(pch,dummy)+strlen(dummy); pch = pch2;
 								}
-								MPT_tmp->AddProperty(propertyName,photonEnergyArray,valueArray,nEntries);
+								MPT_tmp->AddProperty(G4OpticalPropertyName(propertyName),photonEnergyArray,valueArray,nEntries);
 							}
 						}
 						else if (strcmp(tmpString1,"setMaterialPropertiesTable")==0){

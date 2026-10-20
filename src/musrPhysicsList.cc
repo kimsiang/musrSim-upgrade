@@ -216,6 +216,7 @@ void musrPhysicsList::ConstructProcess()
 
 #include "G4ComptonScattering.hh"
 #include "G4GammaConversion.hh"
+#include "G4GammaConversionToMuons.hh"
 #include "G4PhotoElectricEffect.hh"
 #include "G4RayleighScattering.hh"
 
@@ -330,6 +331,7 @@ void musrPhysicsList::ConstructEM()
 	  if      (stringProcessName=="G4PhotoElectricEffect")      pManager->AddDiscreteProcess(new G4PhotoElectricEffect);
 	  else if (stringProcessName=="G4ComptonScattering")        pManager->AddDiscreteProcess(new G4ComptonScattering);
 	  else if (stringProcessName=="G4GammaConversion")          pManager->AddDiscreteProcess(new G4GammaConversion);
+	  else if (stringProcessName=="G4GammaConversionToMuons")   pManager->AddDiscreteProcess(new G4GammaConversionToMuons);
 	  else if (stringProcessName=="G4RayleighScattering")       pManager->AddDiscreteProcess(new G4RayleighScattering);
 //cks 14.12.2011  	  else if (stringProcessName=="G4PenelopePhotoElectric")    pManager->AddDiscreteProcess(new G4PenelopePhotoElectric);
 //cks 14.12.2011  	  else if (stringProcessName=="G4PenelopeCompton")          pManager->AddDiscreteProcess(new G4PenelopeCompton);

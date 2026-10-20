@@ -50,15 +50,10 @@ F04GlobalField* F04GlobalField::object = 0;
 F04GlobalField::F04GlobalField() : G4ElectroMagneticField(),
                              minStep(0.01*CLHEP::mm), deltaChord(3.0*CLHEP::mm),
                              deltaOneStep(0.01*CLHEP::mm), deltaIntersection(0.1*CLHEP::mm),
-                             epsMin(2.5e-7*CLHEP::mm), epsMax(0.05*CLHEP::mm),
+                             // epsMax was 0.05; Geant4 >= 11 rejects values above 0.01
+                             epsMin(2.5e-7*CLHEP::mm), epsMax(0.01*CLHEP::mm),
                              fEquation(0), fFieldManager(0), 
                              fFieldPropagator(0), fStepper(0), fChordFinder(0)
-// F04GlobalField::F04GlobalField() : G4MagneticField(),
-//                             minStep(0.01*mm), deltaChord(3.0*mm),
-//                             deltaOneStep(0.01*mm), deltaIntersection(0.1*mm),
-//                             epsMin(2.5e-7*mm), epsMax(0.05*mm),
-//                             fEquation(0), fFieldManager(0),
-//  			     fFieldPropagator(0), fStepper(0), fChordFinder(0)
 {
 
   fFieldMessenger = new F04FieldMessenger(this);

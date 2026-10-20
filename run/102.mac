@@ -155,12 +155,12 @@
 ###################################################################################
 /vis/disable
 #/control/execute visFromToni.mac
-#/control/execute visDawn102.mac
+#/control/execute visDawn101.mac
 #/control/execute visVRML.mac
 ###################################################################################
 ######################### P A R T I C L E   G U N #################################
 ###################################################################################
-#/gps/particle ion
+/gps/particle ion
 #/gps/ion 39 86
 #/gps/ion 27 57 0 0
 /gps/ion 38 90 0 0

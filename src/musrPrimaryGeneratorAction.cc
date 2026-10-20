@@ -41,6 +41,18 @@
 #include "musrRootOutput.hh"   //cks for storing some info in the Root output file
 #include "musrErrorMessage.hh"
 #include "EcoMug.h"   // Y. ZENG 25 Apr 2024
+#include <cstdlib>
+
+#ifndef CRY_DATA_DIR
+#define CRY_DATA_DIR "cryData"
+#endif
+
+// Location of the CRY data tables: $CRYDATAPATH if set, otherwise the
+// directory configured at build time (CMake option CRY_DATA_DIR).
+static std::string GetCRYDataPath() {
+  const char* env = std::getenv("CRYDATAPATH");
+  return (env && *env) ? std::string(env) : std::string(CRY_DATA_DIR);
+}
 
 std::unique_ptr<EcoMug> musrPrimaryGeneratorAction::fEcoMug = std::make_unique<EcoMug>();            // Y. ZENG 25 Apr 2024
 musrPrimaryGeneratorAction::SkyShape musrPrimaryGeneratorAction::fSkyShape = kPlane;                 // Y. ZENG 25 Apr 2024
@@ -778,7 +790,7 @@ void musrPrimaryGeneratorAction::swapTheAxisInTurtle(float& x_x, float& x_xprime
 
 //===============================================================================   Y. ZENG 23 Apr 2024
 void musrPrimaryGeneratorAction::UpdateCRY(std::string* MessInput){
-  CRYSetup *setup = new CRYSetup(*MessInput, "/lustre/collider/zengyonghao/muography/musrSim-upgrade/cryData");
+  CRYSetup *setup = new CRYSetup(*MessInput, GetCRYDataPath());
 
   cryGen = new CRYGenerator(setup);
 
@@ -809,7 +821,7 @@ void musrPrimaryGeneratorAction::CRYFromFile(G4String newValue){
       setupString.append(" ");
     }
 
-    CRYSetup *setup = new CRYSetup(setupString, "/lustre/collider/zengyonghao/muography/musrSim-upgrade/cryData");
+    CRYSetup *setup = new CRYSetup(setupString, GetCRYDataPath());
 
     // set random number generator
     RNGWrapper<CLHEP::HepRandomEngine>::set(CLHEP::HepRandom::getTheEngine(),&CLHEP::HepRandomEngine::flat);
