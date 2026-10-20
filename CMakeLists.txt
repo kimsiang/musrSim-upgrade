@@ -1,94 +1,69 @@
 #----------------------------------------------------------------------------
 # Setup the project
-cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
-project(musrSim_upgrade)
+cmake_minimum_required(VERSION 3.16...3.31)
+project(musrSim_upgrade CXX)
 
-set(CMAKE_CXX_STANDARD 14)
+#----------------------------------------------------------------------------
+# Find ROOT (via root-config, see FindROOT.cmake)
+include(${PROJECT_SOURCE_DIR}/FindROOT.cmake)
+
+# Use the same C++ standard as ROOT was built with (at least C++17, required by Geant4 11)
+set(CMAKE_CXX_STANDARD 17)
+execute_process(COMMAND ${ROOT_CONFIG_EXECUTABLE} --cflags
+                OUTPUT_VARIABLE _root_cflags OUTPUT_STRIP_TRAILING_WHITESPACE)
+if(_root_cflags MATCHES "-std=(c|gnu)\\+\\+([0-9]+)" AND CMAKE_MATCH_2 GREATER 17)
+  set(CMAKE_CXX_STANDARD ${CMAKE_MATCH_2})
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-#----------------------------------------------------------------------------
-# KAMIL CHANGES:
-#include_directories ("/home/download/Root_5.24_source/root/include")
-# Load some basic macros which are needed later on
-include(FindROOT.cmake)
-
-set(INCLUDE_DIRECTORIES ${ROOT_INCLUDE_DIR} ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/src_cry)
-include_directories( ${INCLUDE_DIRECTORIES})
-
-set(LINK_DIRECTORIES ${ROOT_LIBRARY_DIR})
-link_directories( ${LINK_DIRECTORIES})
+message(STATUS "musrSim: using C++${CMAKE_CXX_STANDARD}")
 
 #----------------------------------------------------------------------------
-# Find Geant4 package, activating all available UI and Vis drivers by default
-# You can set WITH_GEANT4_UIVIS to OFF via the command line or ccmake/cmake-gui
-# to build a batch mode only executable
-#
-option(WITH_GEANT4_UIVIS "Build example with Geant4 UI and Vis drivers" ON)
+# Find Geant4 package, activating all available UI and Vis drivers by default.
+# Set WITH_GEANT4_UIVIS to OFF to build a batch-mode-only executable.
+option(WITH_GEANT4_UIVIS "Build with Geant4 UI and Vis drivers" ON)
 if(WITH_GEANT4_UIVIS)
   find_package(Geant4 REQUIRED ui_all vis_all)
 else()
   find_package(Geant4 REQUIRED)
 endif()
-
-#----------------------------------------------------------------------------
-# Setup Geant4 include directories and compile definitions
-# Setup include directory for this project
-#
 include(${Geant4_USE_FILE})
-# include_directories(${PROJECT_SOURCE_DIR}/include)
 
-
-#----------------------------------------------------------------------------
-# Locate sources and headers for this project
-# NB: headers are included so they will show up in IDEs
-#
-file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cc ${PROJECT_SOURCE_DIR}/src/*.cpp ${PROJECT_SOURCE_DIR}/src_cry/*.cc)
-file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh ${PROJECT_SOURCE_DIR}/include/*.h ${PROJECT_SOURCE_DIR}/src_cry/*.hh ${PROJECT_SOURCE_DIR}/src_cry/*.h)
+include_directories(${PROJECT_SOURCE_DIR}/include
+                    ${PROJECT_SOURCE_DIR}/src_cry
+                    ${ROOT_INCLUDE_DIR})
+link_directories(${ROOT_LIBRARY_DIR})
 
 #----------------------------------------------------------------------------
-# Add the executable, and link it to the Geant4 libraries
-#
-add_executable(musrSim_upgrade musrSim.cc ${sources} ${headers} include/rootEventSelector.hh src/rootEventSelector.cc)
-##FIND_PACKAGE( ROOT )
-#SET(ROOT_CONFIG_EXECUTABLE /home/download/Root_5.24_source/root/bin/root-config)
-## ask root-config for the library varaibles
-#EXEC_PROGRAM( ${ROOT_CONFIG_EXECUTABLE}
-# ARGS "--noldflags --noauxlibs --libs"
-# OUTPUT_VARIABLE root_flags )
-##SET(ROOT_LIBRARIES ${root_flags})
-#EchoString("Kamil ${root_flags}  Kamil")
-#target_link_libraries(musrSim ${Geant4_LIBRARIES} ${root_flags})
-target_link_libraries(musrSim_upgrade ${Geant4_LIBRARIES} ${ROOT_LIBRARIES})
-#----------------------------------------------------------------------------
-# Copy all scripts to the build directory, i.e. the directory in which we
-# build B1. This is so that we can run the executable directly because it
-# relies on these scripts being in the current working directory.
-#
-set(EXAMPLEB1_SCRIPTS
-  run/101.mac
-  run/102.mac
-  run/visVRML.mac
-  run/CRYExample.mac
-  run/CRYSetup.file
-  run/EcoMugExample.mac
-  )
+# Directory holding the CRY cosmic-ray data tables (cosmics_*.data).
+# Can be overridden at configure time (-DCRY_DATA_DIR=...) or at run time
+# with the CRYDATAPATH environment variable.
+set(CRY_DATA_DIR "${PROJECT_SOURCE_DIR}/cryData" CACHE PATH "Directory with CRY data files")
 
-foreach(_script ${EXAMPLEB1_SCRIPTS})
-  configure_file(
-    ${PROJECT_SOURCE_DIR}/${_script}
-    ${PROJECT_BINARY_DIR}/${_script}
-    COPYONLY
-    )
+#----------------------------------------------------------------------------
+# Sources and headers (headers are listed so they show up in IDEs)
+file(GLOB sources ${PROJECT_SOURCE_DIR}/src/*.cc
+                  ${PROJECT_SOURCE_DIR}/src/*.cpp
+                  ${PROJECT_SOURCE_DIR}/src_cry/*.cc)
+file(GLOB headers ${PROJECT_SOURCE_DIR}/include/*.hh
+                  ${PROJECT_SOURCE_DIR}/include/*.h
+                  ${PROJECT_SOURCE_DIR}/src_cry/*.hh
+                  ${PROJECT_SOURCE_DIR}/src_cry/*.h)
+
+#----------------------------------------------------------------------------
+# Executable
+add_executable(musrSim musrSim.cc ${sources} ${headers})
+target_compile_definitions(musrSim PRIVATE CRY_DATA_DIR="${CRY_DATA_DIR}")
+target_link_libraries(musrSim ${Geant4_LIBRARIES} ${ROOT_LIBRARIES})
+
+#----------------------------------------------------------------------------
+# Copy the macros and input tables from run/ to <build>/run, so the
+# executable can be run directly from there (cd build/run; ../musrSim 101.mac).
+file(GLOB run_files LIST_DIRECTORIES false ${PROJECT_SOURCE_DIR}/run/*)
+foreach(_file ${run_files})
+  get_filename_component(_name ${_file} NAME)
+  configure_file(${_file} ${PROJECT_BINARY_DIR}/run/${_name} COPYONLY)
 endforeach()
 
 #----------------------------------------------------------------------------
-# For internal Geant4 use - but has no effect if you build this
-# example standalone
-#
-#add_custom_target(musrSim DEPENDS musrSim)
-
-#----------------------------------------------------------------------------
 # Install the executable to 'bin' directory under CMAKE_INSTALL_PREFIX
-#
-install(TARGETS musrSim_upgrade DESTINATION bin)
-
-
+install(TARGETS musrSim DESTINATION bin)

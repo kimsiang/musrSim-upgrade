@@ -86,8 +86,8 @@ void F04ElementField::construct()
   G4cout<<"F04ElementField: center="<<center.x()/CLHEP::mm<<", "<<center.y()/CLHEP::mm<<", "<<center.z()/CLHEP::mm<<" mm"<<G4endl;
   aNavigator->LocateGlobalPointAndSetup(center,0,false);
 
-  G4TouchableHistoryHandle fTouchable = aNavigator->
-                                         CreateTouchableHistoryHandle();
+  // G4TouchableHistoryHandle was removed in Geant4 11.2; "auto" works with both old and new versions.
+  auto fTouchable = aNavigator->CreateTouchableHistoryHandle();
 
   G4int depth = fTouchable->GetHistoryDepth();
   for (G4int i = 0; i<depth; ++i) {
