@@ -1,3 +1,11 @@
+########## Meng Lv's gitignore ##########
+/cmake-build-debug/
+/cmake-build-default/
+/install/
+/build/
+/.idea/
+/run/multiSimuScript/
+########################################
 
 # macOS / local tool settings
 .DS_Store
