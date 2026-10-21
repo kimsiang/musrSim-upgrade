@@ -1,0 +1,42 @@
+% ======================================================================
+%  musrSim: A Hands-On Geant4 Tutorial  --  second edition
+%  Build:  cd doc && latexmk -xelatex musrSim_tutorial.tex
+%          (or run xelatex twice)
+% ======================================================================
+\documentclass[11pt,oneside,openany]{report}
+\input{preamble}
+
+\hypersetup{
+  pdftitle={musrSim: A Hands-On Geant4 Tutorial},
+  pdfauthor={TDLI Muon Physics Group},
+  pdfsubject={Geant4 simulation of muon experiments with musrSim},
+}
+
+\begin{document}
+\pagenumbering{roman}
+\input{chapters/00_frontmatter}
+
+\cleardoublepage
+\pagenumbering{arabic}
+\input{chapters/01_big_picture}
+\input{chapters/02_install}
+\input{chapters/03_macro_language}
+\input{chapters/04_geometry}
+\input{chapters/05_beam}
+\input{chapters/06_output}
+\input{chapters/07_python}
+\input{chapters/08_fields_physics_scale}
+\input{chapters/09_capstone}
+\input{chapters/10_troubleshooting}
+
+\appendix
+\input{chapters/A_commands}
+\input{chapters/B_branches}
+\input{chapters/C_materials_solids}
+\input{chapters/D_skeleton}
+\input{chapters/E_cosmics}
+\input{chapters/F_environment}
+\input{chapters/G_glossary}
+\input{chapters/H_reading}
+
+\end{document}

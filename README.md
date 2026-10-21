@@ -26,6 +26,10 @@ The macros and input tables in `run/` are copied to `build/run/` during `cmake`.
 
 Usage: `../musrSim <steering_file.mac> [output_name | idle] [random_seed_offset]`
 
+## Tutorial
+
+A hands-on manual for this version is in [`doc/musrSim_tutorial.pdf`](doc/musrSim_tutorial.pdf) (LaTeX source in `doc/`; build with `cd doc && latexmk -xelatex musrSim_tutorial.tex`). Its worked examples ship as `run/first_sim.mac` and `run/tf_musr.mac`, with analysis scripts in `doc/scripts/`.
+
 ## CRY cosmic-ray generator
 
 `CRYExample.mac` needs the CRY data tables (`cosmics_*.data`). They are not included in this repository: copy the `data/` files from the [CRY distribution](https://nuclear.llnl.gov/simulation/) into a `cryData/` folder at the top of the repository, or point to them at run time:

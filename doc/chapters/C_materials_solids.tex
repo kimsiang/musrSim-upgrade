@@ -1,0 +1,36 @@
+\chapter{Materials and solids reference}
+\label{app:solids}
+
+\eyebrow{Frequently used NIST materials}
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.45\textwidth} L@{}}
+\toprule
+\code{G4_Galactic} & Ideal vacuum.\\
+\code{G4_AIR} & Air (the usual world).\\
+\code{G4_PLASTIC_SC_VINYLTOLUENE} & Plastic scintillator.\\
+\code{G4_Cu}, \code{G4_Al}, \code{G4_Pb}, \code{G4_Fe}, \code{G4_W}, \code{G4_Ag}, \code{G4_Au} & Common metals.\\
+\code{G4_MYLAR}, \code{G4_KAPTON}, \code{G4_POLYETHYLENE} & Films and light materials.\\
+\code{G4_WATER}, \code{G4_Si}, \code{G4_Ge}, \code{G4_CONCRETE} & Water, semiconductors, concrete.\\
+\bottomrule
+\end{tabularx}}
+
+Any name from Geant4's NIST database works (\code{G4_...}). In addition, \code{musrDetectorConstruction::DefineMaterials()} defines: \code{Scintillator}, \code{Mylar}, \code{Brass}, \code{Steel}, \code{Water}, \code{Aerogel}, \code{LaBr3}, \code{Macor}, \code{MCPglass}, \code{MgO}, \code{SiO2}, \code{Al2O3}, \code{K2O}, \code{B2O3}, \code{Air}, \code{Vacuum}, \code{ArgonGas}, \code{Rock}, \code{Concrete}, low-pressure air (\code{Air1mbar}, \code{AirE1mbar} \dots \code{AirE6mbar}) and a series of helium gases (\code{HeliumGas5mbar} \dots \code{HeliumGas100mbar}, \code{HeliumGasSat4K}, \dots).
+
+\eyebrow{Solids and their dimension fields (mm, deg; box/tube extents are half-lengths)}
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}l L@{}}
+\toprule
+\code{box} & half-x, half-y, half-z\\
+\code{tubs} & rMin, rMax, half-z, \(\phi_0\), \(\Delta\phi\)\\
+\code{cons} & rMin1, rMax1, rMin2, rMax2, half-z, \(\phi_0\), \(\Delta\phi\)\\
+\code{sphere} & rMin, rMax, \(\phi_0\), \(\Delta\phi\), \(\theta_0\), \(\Delta\theta\)\\
+\code{trd} & half-x1, half-x2, half-y1, half-y2, half-z\\
+\code{para} & half-x, half-y, half-z, \(\alpha\), \(\theta\), \(\phi\)\\
+\code{torus} & rMin, rMax, rTorus, \(\phi_0\), \(\Delta\phi\)\\
+\code{polyconeA} & \(\phi_0\), \(\Delta\phi\), \(n\), arrays z, rInner, rOuter (from \code{arrayDef})\\
+\code{polyconeB} & \(\phi_0\), \(\Delta\phi\), \(n\), arrays r, z\\
+\code{stl} & an STL file name instead of dimensions (CADMesh import, mm)\\
+\bottomrule
+\end{tabularx}}
+
+\textbf{Composite shapes} hard-coded in \code{musrDetectorConstruction.cc} (read the source for their parameters): \code{boxbox}, \code{tubsbox}, \code{tubsbox2}, \code{tubsboxsegm}, \code{cylpart}, \code{uprofile}, \code{cruciform}, \code{trd90y}, \code{tubeWithWindows}, \code{TubeWithTubeHole}, \code{TubeWithHolePlusTubeHole}, \code{TubeWithHoleAndTubeHole}, \code{BarWithBevelledEdgesX}, \code{alcSupportPlate}, and the PSI instrument parts \code{GPDcollimator}, \code{GPDmHolder}, \code{GPDsampleHolderA}, \code{GPSforward}, \code{GPSbackward}, \code{GPSbackwardVeto}.

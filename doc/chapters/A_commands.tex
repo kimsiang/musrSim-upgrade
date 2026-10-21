@@ -1,0 +1,85 @@
+\chapter{Command quick reference}
+\label{app:commands}
+A summary of every command family, checked against the \texttt{musrSim-upgrade} source (\code{musrDetectorConstruction.cc}, \code{musrPhysicsList.cc}, \code{musrPrimaryGeneratorMessenger.cc}, \code{musrDetectorMessenger.cc}). Units inside \code{/musr/command} lines are fixed: mm, degrees, tesla, kV/mm, ns. \code{/gun} commands take an explicit unit.
+
+\eyebrow{Geometry}
+\begin{lstlisting}[style=mac]
+/musr/command construct <solid> <name> <dims...> <material> <x y z> <log_mother> <rot> <sens> <volID>
+/musr/command construct stl <name> <file.stl> <material> <x y z> <log_mother> <rot> <sens> <volID>
+/musr/command rotation <name> <ax ay az angle>        # axis-angle (angle != 0)
+/musr/command rotation <name> <phi theta psi>         # Euler angles
+/musr/command arrayDef <name> <n> <v1 ... vn>         # arrays for polyconeA/B
+/musr/command visattributes <log_name | material> <colour | invisible>
+# solids: box tubs cons sphere trd para torus polyconeA polyconeB stl + composites (Appendix C)
+# sens:   musr/ScintSD (detector) | dead (inert)
+# magic names: World, Target, M0/M1/M2, *save*, kill*, shield*
+\end{lstlisting}
+
+\eyebrow{Physics}
+\begin{lstlisting}[style=mac]
+/musr/command process addProcess <particle> <G4Process> <atRest> <alongStep> <postStep>
+/musr/command process addDiscreteProcess <particle> <G4Process>
+/musr/command process cutForGamma <mm>        /musr/command process cutForElectron <mm>
+/musr/command G4OpticalPhotons <true|false>
+/musr/command materialPropertiesTable <table> <PROPERTY> <n> <energies...> <values...>   # n=0: constant
+/musr/command setMaterialPropertiesTable <table> <material>
+/musr/command opticalSurface <name> <phys_vol1> <phys_vol2> <type> <finish> <model> [<table>]
+/musr/command killAllElectrons|killAllPositrons|killAllGammas|killAllNeutrinos <true|false>
+/musr/command SetUserLimits <log_name> ...      /musr/command region define <region> <log_name>
+\end{lstlisting}
+
+\eyebrow{Fields}
+\begin{lstlisting}[style=mac]
+/musr/command globalfield <name> <hx hy hz> uniform <x y z> <log_vol> <Bx By Bz> <Ex Ey Ez>
+/musr/command globalfield <name> <x y z> fromfile <format> <file> <log_vol> <value> [<final> <nSteps>]
+/musr/command globalfield <name> <x y z> quadrupole <halfLength> <radius> <fringe> <log_vol> <gradient>
+/musr/command globalfield setparameter <SetLargestAcceptableStep|SetMinimumEpsilonStep|
+              SetMaximumEpsilonStep|SetDeltaOneStep|SetDeltaIntersection|SetMaxLoopCount> <value>
+/musr/command globalfield printparameters
+/musr/command globalfield printFieldValueAtPoint <x y z>
+\end{lstlisting}
+
+\eyebrow{Output and run control}
+\begin{lstlisting}[style=mac]
+/musr/command SetOutputFileName <DEFAULT | suffix>     # data/musrSim_jp<NNN>[_suffix].root
+/musr/command rootOutputDirectoryName <dir>
+/musr/command rootOutput <branch-switch> <off | on>
+/musr/command storeOnlyEventsWithHits <true|false>
+/musr/command storeOnlyEventsWithHitInDetID <id>
+/musr/command storeOnlyEventsWithMuonsDecayedInDetID <id>
+/musr/command storeOnlyTheFirstTimeHit <true|false>
+/musr/command signalSeparationTime <ns>
+/musr/command maximumRunTimeAllowed <s>                # default 85000
+/musr/command maximumTimePerEvent <s>
+/musr/command maximumNrOfStepsPerTrack <n>
+/musr/command SetRndSeedOffset <n>     /musr/command SetRndSeed <n>
+/musr/run/randomOption <0|1|2|3|4|5>   /musr/run/howOftenToPrintEvent <n>
+/musr/run/runID <n>
+/run/beamOn <N>
+\end{lstlisting}
+
+\eyebrow{Beam (particle gun)}
+\begin{lstlisting}[style=mac]
+/gun/primaryparticle <mu+|mu-|e+|e-|proton|...>
+/gun/vertex <x y z> mm             /gun/vertexsigma <sx sy sz> mm    # +Gaussian, -uniform
+/gun/vertexboundary <rMax zMin zMax> mm                /gun/vertexrelativer <rMax> mm
+/gun/momentum <p> MeV              /gun/kenergy <T> MeV               /gun/momentumsmearing <sigma> MeV
+/gun/momentumboundary <pMin pMax 0> MeV
+/gun/direction <dx dy dz>          /gun/tilt <ax ay 0> deg            /gun/tiltsigma <sx sy 0> deg
+/gun/pitch <angle> deg
+/gun/muonPolarizVector <x y z>     /gun/muonPolarizFraction <-1..1>
+/gun/decaytimelimits <min max meanlife> ns                  # active only if max > 0
+/gun/starttime <t> ns  /gun/starttimesigma <t> ns  /gun/meanarrivaltime <t> ns
+/gun/turtlefilename <file>  /gun/turtleZ0position <z> mm  /gun/turtleMomentumScalingFactor <f>
+/gun/turtleInterpretAxes <mode>  /gun/turtleMomentumBite <...>  /gun/turtleFirstEventNr <n>
+\end{lstlisting}
+
+\eyebrow{Cosmic rays (Appendix \ref{app:cosmics})}
+\begin{lstlisting}[style=mac]
+/gun/ecomug/useEcoMug true
+/gun/ecomug/shapeConstruct <plane|sphere|cylinder> <s1 s2 cx cy cz>          # mm
+/gun/ecomug/constraints <pMin pMax thetaMin thetaMax phiMin phiMax>       # MeV/c, deg
+/gun/cry/useCRY true
+/gun/cry/input <key value>  ...  then  /gun/cry/update       # or: /gun/cry/file <setup file>
+/gun/cosmic_v1 <true|false>
+\end{lstlisting}

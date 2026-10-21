@@ -1,0 +1,17 @@
+\chapter{Glossary}
+\label{app:glossary}
+\begin{description}[style=nextline,leftmargin=0pt,itemsep=0.45em,font=\sffamily\bfseries\color{navy}]
+\item[Asymmetry] The normalised difference in positron counts between two opposing detectors, \((N_1-N_2)/(N_1+N_2)\); the primary \muSR\ observable. The muon lifetime cancels in the ratio.
+\item[Event] One primary particle (or one CRY shower) tracked with all its secondaries; one stored event is one row of \code{t1}.
+\item[Half-length] Half the full extent of a solid along an axis; the convention Geant4 (and hence \code{construct}) uses for box and tube dimensions.
+\item[Hit] Energy deposited in one sensitive (\code{musr/ScintSD}) volume within one signal-separation window; an event may contain several, stored as arrays of length \code{det_n}.
+\item[Jagged array] A variable-length-per-event array (like \code{det_edep}); handled in Python with \code{awkward}, not plain NumPy.
+\item[Larmor frequency] The muon spin-precession frequency in a field, \(f=(\gamma_\mu/2\pi)B\) with \(\gamma_\mu/2\pi\approx\SI{135.54}{MHz/T}\).
+\item[Physics block] The \code{/musr/command process ...} lines that define a run's electromagnetic physics; without them nothing interacts.
+\item[Sensitive detector] A volume that records hits; here \code{musr/ScintSD}, distinguished per volume by its volumeID.
+\item[Sentinel value] A placeholder (\(-1000\), sometimes \(-999\)) meaning ``not defined for this event''; cut it before analysis.
+\item[Steering file] Another name for the macro passed on the command line --- the only file whose \code{/musr/command} lines are read.
+\item[Surface muon] A \(\approx\SI{29.8}{MeV/c}\), nearly fully spin-polarised \(\mu^+\) from pion decay at rest; stops in the first fraction of a millimetre of a sample.
+\item[TURTLE] A beam-optics transport code whose output files can drive the \musrSim\ beam for realistic beamline studies.
+\item[\texorpdfstring{\(\mu\)SR}{muSR}] Muon spin rotation / relaxation / resonance: using the implanted muon's spin as a local magnetic probe of matter.
+\end{description}

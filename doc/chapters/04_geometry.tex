@@ -1,0 +1,238 @@
+\chapter{Building geometry with \texttt{construct}}
+\label{ch:geometry}
+
+\begin{willdo}
+\begin{itemize}
+  \item Read and write the \code{/musr/command construct} line field by field.
+  \item Never again confuse a half-length with a length.
+  \item Nest volumes correctly using the \code{log_} mother convention and local coordinates.
+  \item Rotate volumes, choose materials, import CAD, make a volume a detector, and use the special volume names.
+\end{itemize}
+\end{willdo}
+
+Almost all of an instrument is geometry, and in \musrSim\ almost all geometry is one command repeated: \code{/musr/command construct}. Each call builds one Geant4 volume --- a shape, made of a material, placed inside a parent. Learn this single line thoroughly and the rest is repetition.
+
+\section{The construct grammar}
+Every \code{construct} call has the same field order. Here is the world volume from the bundled GPD example, \code{run/201.mac}, with each field numbered.
+
+\begin{lstlisting}[style=mac,caption={One \texttt{construct} line, dissected}]
+/musr/command construct box World 2100 2100 11000 G4_AIR 0 0 0 no_logical_volume norot dead -1
+#                       (1)  (2)  (3)--------------(4)    (5)-- (6)-------------- (7)-- (8)-(9)
+\end{lstlisting}
+
+\begin{enumerate}[label=\textbf{(\arabic*)}]
+  \item \textbf{solid} --- the shape keyword: \code{box}, \code{tubs}, \code{cons}, \code{sphere}, \code{trd}, \code{para}, \code{torus}, \code{polyconeA}/\code{polyconeB}, \code{stl}, or a composite shape hard-coded in the source (Section~\ref{sec:solids}).
+  \item \textbf{name} --- your label for this volume. Its logical volume is then referred to elsewhere as \code{log_<name>} (here \code{log_World}). Choose names carefully: some names are magic (Section~\ref{sec:magic}).
+  \item \textbf{dimensions} --- the size parameters for that solid, in millimetres and degrees. Their number depends on the shape. For boxes and tubes these are \emph{half}-lengths (Section~\ref{sec:half}).
+  \item \textbf{material} --- a Geant4/NIST material such as \code{G4_AIR}, \code{G4_Cu}, \code{G4_Galactic} (vacuum) or \code{G4_PLASTIC_SC_VINYLTOLUENE} (Section~\ref{sec:solids}).
+  \item \textbf{x y z} --- the position of this volume's centre, in the local coordinates of its mother, in mm.
+  \item \textbf{mother} --- the logical volume that contains this one, written \code{log_<mother>}. The world is the sole exception: its mother is the literal token \code{no_logical_volume}.
+  \item \textbf{rotation} --- the name of a rotation matrix defined earlier, or \code{norot} (Section~\ref{sec:rot}).
+  \item \textbf{sensitivity} --- \code{musr/ScintSD} to make it a detector, or \code{dead} for inert material (Section~\ref{sec:magic}).
+  \item \textbf{volumeID} --- an integer that identifies this volume in the ROOT output. For detectors it becomes \code{det_ID}; for every volume it is the label stored in \code{muDecayDetID} when a muon decays there.
+\end{enumerate}
+
+\begin{keypoint}
+The world volume must be named exactly \code{World}, must use \code{no_logical_volume} as its mother, and is conventionally \code{dead} with ID \code{-1}. Everything else you build lives inside it, directly or indirectly.
+\end{keypoint}
+
+\section{Half-lengths: the number-one beginner trap}
+\label{sec:half}
+For a box, the three dimensions are the \emph{half}-widths along \(x\), \(y\) and \(z\) --- not the full edge lengths. This is inherited straight from Geant4's \code{G4Box}. The same convention applies to the \(z\)-extent of a \code{tubs} (tube) and to most other solids.
+
+\begin{center}
+\begin{tikzpicture}[scale=1]
+  \draw[fill=cyanbg,draw=cyan,line width=0.8pt] (-2,-2) rectangle (2,2);
+  \fill[navy] (0,0) circle (1.6pt) node[below right,font=\sffamily\scriptsize,text=navy]{origin};
+  \draw[arr] (0,0) -- (2,0) node[midway,above,font=\sffamily\scriptsize,text=navy]{half-x = 50};
+  \draw[arr] (0,0) -- (0,2) node[midway,left,font=\sffamily\scriptsize,text=navy]{half-y = 50};
+  \draw[{Stealth[length=2mm]}-{Stealth[length=2mm]},muted] (-2,-2.45) -- (2,-2.45) node[midway,below,font=\sffamily\scriptsize]{full width = 100 mm};
+\end{tikzpicture}
+\end{center}
+
+So \code{construct box Slab 50 50 5 ...} creates a slab that is \SI{100}{mm} wide, \SI{100}{mm} tall and \SI{10}{mm} thick. If you mean a \SI{100}{mm} cube you write \code{50 50 50}, not \code{100 100 100}.
+
+\begin{pitfall}
+Doubling errors from this one convention are the most common geometry bug in Geant4. When a detector seems twice as efficient as it should be, or a collimator hole is half the expected size, check your half-lengths first. A useful habit: write the intended full size in a comment line just above the \code{construct}.
+\end{pitfall}
+
+\section{Mothers, daughters, and local coordinates}
+Geant4 geometry is a strict hierarchy. Every volume (except the world) sits inside exactly one mother volume, and its position is given in the mother's \emph{local} frame, with the mother's centre as origin. A daughter must fit entirely within its mother, and sibling daughters must not intersect.
+
+\begin{center}
+\begin{tikzpicture}
+  \draw[draw=navy,fill=icebg,rounded corners=2pt] (0,0) rectangle (10,3.4);
+  \node[font=\sffamily\scriptsize,text=navy,anchor=north west] at (0.15,3.3) {\textbf{World} (mother = \texttt{no\_logical\_volume})};
+  \draw[draw=cyan,fill=cyanbg,rounded corners=2pt] (4.2,0.5) rectangle (8.8,2.6);
+  \node[font=\sffamily\scriptsize,text=navy,anchor=north west] at (4.3,2.5) {\textbf{GPDsampleCell} (mother = \texttt{log\_World})};
+  \draw[draw=eblue,fill=paleblue] (6.0,0.9) rectangle (7.2,1.8);
+  \node[font=\sffamily\scriptsize,text=navy] at (6.6,1.35) {target};
+  \node[font=\sffamily\scriptsize,text=muted,anchor=west] at (7.3,1.1) {mother = \texttt{log\_GPDsampleCell}};
+\end{tikzpicture}
+\end{center}
+
+To place a volume inside a mother other than the world, set field~(6) to \code{log_<mothername>} and give its coordinates relative to that mother. In \code{201.mac} the copper target sits inside a sample cell, not directly in the world:
+
+\begin{lstlisting}[style=mac,caption={A daughter inside a non-world mother (from \texttt{201.mac})}]
+/musr/command construct tubs target 0 3.5 7 0 360 G4_Cu 0 0 0 log_GPDsampleCell norot dead 201
+\end{lstlisting}
+
+The target's centre is at \((0,0,0)\) in the sample cell's frame, which itself may sit deep inside the world. You cannot read a volume's global position from its \code{construct} line alone --- follow the chain of mothers.
+
+\begin{pitfall}
+The mother must be constructed \emph{before} the daughter, and referenced by its logical name \code{log_<mother>}, not its bare name. Writing \code{GPDsampleCell} instead of \code{log_GPDsampleCell}, or placing the daughter above the mother in the file, stops the run with a ``logical volume not found'' error.
+\end{pitfall}
+
+\section{Rotations}
+\label{sec:rot}
+A volume is placed unrotated with the keyword \code{norot}. To rotate it, first define a named rotation matrix on an earlier line, then use that name in field~(7). \musrSim\ accepts two forms and tells them apart by the fourth number.
+
+\textbf{Axis--angle.} Give a rotation axis \((a_x,a_y,a_z)\) and a non-zero angle in degrees. From \code{201.mac}:
+
+\begin{lstlisting}[style=mac,caption={Axis--angle rotations: axis, then angle}]
+# 90 deg about the x-axis; 28.81 deg about y; 45 deg about z
+/musr/command rotation matrix1 1 0 0 90
+/musr/command rotation matrix2 0 1 0 28.81
+/musr/command rotation matrix4 0 0 1 45
+\end{lstlisting}
+
+\textbf{Euler angles.} Give three angles \(\phi,\theta,\psi\) in degrees and no fourth number (or a fourth number of zero):
+
+\begin{lstlisting}[style=mac,caption={Euler-angle rotation}]
+/musr/command rotation matrix6 180 90 90
+\end{lstlisting}
+
+You then attach the matrix by name, exactly as the backward positron counters in \code{201.mac} do:
+
+\begin{lstlisting}[style=mac,caption={Using a named rotation when placing a volume}]
+/musr/command construct box ScintB1 13 45 2.5 G4_PLASTIC_SC_VINYLTOLUENE 22 0 -40 log_World matrix2 musr/ScintSD 1
+\end{lstlisting}
+
+\begin{tip}
+Rotations are easy to get backwards. Define one, place one volume with it, visualise (Section~\ref{sec:seeit}), and confirm the orientation before you build ten more volumes on the same matrix.
+\end{tip}
+
+\section{Materials and solids}
+\label{sec:solids}
+Materials are given by their Geant4/NIST names. You do not define common materials; you name them. The handful you will use constantly:
+
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.42\textwidth} L@{}}
+\toprule
+\textbf{NIST name} & \textbf{What it is}\\
+\midrule
+\code{G4_Galactic} & Ideal vacuum (beam pipes, ``save'' planes).\\
+\code{G4_AIR} & Air --- the usual world material.\\
+\code{G4_PLASTIC_SC_VINYLTOLUENE} & Plastic scintillator --- muon and positron counters.\\
+\code{G4_Cu}, \code{G4_Al}, \code{G4_Pb}, \code{G4_W} & Copper, aluminium, lead, tungsten (samples, holders, collimators).\\
+\code{G4_MYLAR}, \code{G4_KAPTON}, \code{G4_POLYETHYLENE} & Windows and light materials.\\
+\bottomrule
+\end{tabularx}}
+
+About fifty extra materials are defined in \code{musrDetectorConstruction::DefineMaterials()} and used by their bare names: \code{Scintillator}, \code{Mylar}, \code{Brass}, \code{Steel}, \code{Water}, \code{Aerogel}, \code{LaBr3}, \code{Macor}, \code{MgO}, \code{Vacuum}, low-pressure air and helium (\code{Air1mbar}, \code{HeliumGas5mbar}, \dots) and --- for muography --- \code{Rock} and \code{Concrete}. Check that function for the exact compositions before relying on one.
+
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}l >{\raggedright\arraybackslash}p{0.42\textwidth} L@{}}
+\toprule
+\textbf{Solid} & \textbf{Dimension fields} & \textbf{Notes}\\
+\midrule
+\code{box} & half-x, half-y, half-z & Rectangular block.\\
+\code{tubs} & rMin, rMax, half-z, \(\phi_0\), \(\Delta\phi\) & Cylinder or tube; angles in degrees.\\
+\code{cons} & rMin1, rMax1, rMin2, rMax2, half-z, \(\phi_0\), \(\Delta\phi\) & Cone / truncated cone.\\
+\code{sphere} & rMin, rMax, \(\phi_0\), \(\Delta\phi\), \(\theta_0\), \(\Delta\theta\) & Full or partial sphere.\\
+\code{trd} & half-x1, half-x2, half-y1, half-y2, half-z & Trapezoid.\\
+\code{para} & half-x, half-y, half-z, \(\alpha\), \(\theta\), \(\phi\) & Parallelepiped.\\
+\code{torus} & rMin, rMax, rTorus, \(\phi_0\), \(\Delta\phi\) & Torus.\\
+\code{polyconeA} & \(\phi_0\), \(\Delta\phi\), \(n\), then three array names (z, rInner, rOuter) & Arrays defined with \code{arrayDef}.\\
+\code{stl} & a file name instead of dimensions & CAD import (below).\\
+\multicolumn{3}{@{}p{\linewidth}@{}}{\small Composite shapes hard-coded in the source: \code{GPDcollimator}, \code{uprofile}, \code{tubsbox}, \code{boxbox}, \code{cruciform}, \dots\ (Appendix~\ref{app:solids}).}\\
+\bottomrule
+\end{tabularx}}
+
+The beam pipe in \code{201.mac} shows the \code{tubs} field order in practice --- a vacuum cylinder, radius 0 to \SI{2005}{mm}, half-length \SI{4500}{mm}, full azimuth:
+
+\begin{lstlisting}[style=mac,caption={A tube (\texttt{tubs}): rMin rMax half-z phiStart phiTotal}]
+/musr/command construct tubs beampipeA 0 2005 4500 0 360 G4_Galactic 0 0 -6100 log_World norot dead 230
+\end{lstlisting}
+
+Polycones take their profile from named arrays, defined first with \code{arrayDef <name> <n> <values...>}:
+
+\begin{lstlisting}[style=mac,caption={A polycone from three arrays (from \texttt{201.mac}, shortened to 4 planes)}]
+/musr/command arrayDef zPl  4   0.   5.   91.  105.
+/musr/command arrayDef rIn  4  10.  11.   31.   31.
+/musr/command arrayDef rOut 4  12.5 15.11 35.11 35.
+/musr/command construct polyconeA veto 0 360 4 zPl rIn rOut G4_PLASTIC_SC_VINYLTOLUENE 0 0 24 log_World norot musr/ScintSD 51
+\end{lstlisting}
+
+\begin{newin}
+\textbf{CAD import.} \code{construct stl <name> <file.stl> <material> <x y z> <log_mother> <rotation> <sensitivity> <volumeID>} reads a tessellated solid from an STL file through the bundled CADMesh library --- handy for a real detector housing or a building in a muography study. CADMesh assumes the STL coordinates are in millimetres. Tessellated solids are slow to track through, so keep meshes modest.
+\end{newin}
+
+\begin{hood}
+Composite solids such as \code{GPDcollimator} exist because Geant4 Boolean operations (subtracting one solid from another) cannot be expressed through the macro grammar. When you need a shape the macro cannot describe, add it to \code{musrDetectorConstruction.cc} and expose it as a new solid keyword --- exactly how \code{GPDcollimator} was created --- or import it with \code{stl}.
+\end{hood}
+
+\section{Making a volume a detector, and the magic names}
+\label{sec:magic}
+Field~(8) decides whether a volume records anything. \code{dead} means inert material that still scatters and stops particles but produces no hits. \code{musr/ScintSD} makes the volume a \emph{sensitive detector}: energy deposits inside it become hits in the ROOT tree, tagged with the integer volumeID you gave in field~(9). That integer appears in the output as \code{det_ID}, and it is how you will later tell one counter from another.
+
+\begin{lstlisting}[style=mac,caption={Five sensitive counters, distinguished only by their volumeID (from \texttt{201.mac})}]
+/musr/command construct box ScintB1 13 45 2.5 G4_PLASTIC_SC_VINYLTOLUENE  22 0 -40 log_World matrix2 musr/ScintSD 1
+/musr/command construct box ScintB2 13 45 2.5 G4_PLASTIC_SC_VINYLTOLUENE -22 0 -40 log_World matrix3 musr/ScintSD 2
+/musr/command construct box ScintF1 13 45 2.5 G4_PLASTIC_SC_VINYLTOLUENE -22 0  40 log_World matrix2 musr/ScintSD 11
+/musr/command construct box ScintF2 13 45 2.5 G4_PLASTIC_SC_VINYLTOLUENE  22 0  40 log_World matrix3 musr/ScintSD 12
+/musr/command construct box M0 5 5 1.0 G4_PLASTIC_SC_VINYLTOLUENE 0 0 -46 log_World matrix4 musr/ScintSD 102
+\end{lstlisting}
+
+\begin{keypoint}
+\code{musr/ScintSD} is the sensitive-detector type for energy deposits. You do not create ten detector types; you create ten sensitive volumes, give each a distinct volumeID, and separate them at analysis time by selecting on \code{det_ID}. This is the mental model that makes the ROOT output (Chapter~\ref{ch:output}) click. (A separate optical-photon readout exists for photocathode studies; see Section~\ref{sec:optical}.)
+\end{keypoint}
+
+Some names are not just labels --- \musrSim\ treats them specially:
+
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.28\textwidth} L@{}}
+\toprule
+\textbf{Name} & \textbf{Special behaviour}\\
+\midrule
+\code{World} & The mandatory outermost volume; mother is \code{no_logical_volume}.\\
+\code{Target} or \code{target} (exact) & Assumed to be the sample. Muon time, polarisation and momentum on entry are stored as \code{muTarget...}; these branches only exist when such a volume is built.\\
+\code{M0}, \code{M1}, \code{M2} (exact; or lower-case) & Typically trigger counters. Muon time and polarisation on entry stored as \code{muM0...}, etc.\\
+name \emph{containing} \code{save} & A tracking plane: records every particle crossing it (\code{save_...} branches), even in vacuum and with no energy deposit. Give it a non-zero volumeID --- ID~0 is not stored.\\
+name \emph{starting with} \code{kill} or \code{Kill} & Any particle entering is deleted from the simulation.\\
+name \emph{starting with} \code{shield} or \code{Shield} & Deletes every particle \emph{except muons} --- used to speed up runs by discarding tracks that cannot reach a detector. Use with care.\\
+\bottomrule
+\end{tabularx}}
+
+\begin{pitfall}
+The magic is triggered by the name. A volume you innocently call \code{PbSaver} or \code{savePlate} becomes a tracking plane (``save'' matches anywhere in the name); one you call \code{killswitch} deletes particles. If you do not want the special behaviour, keep these words out of your names.
+\end{pitfall}
+
+\section{Seeing it, and checking for overlaps}
+\label{sec:seeit}
+Colour a logical volume with \code{visattributes} (this only affects visualisation, never physics):
+
+\begin{lstlisting}[style=mac,caption={Colours for visualisation}]
+/musr/command visattributes log_World invisible
+/musr/command visattributes log_target blue
+/musr/command visattributes log_ScintB1 green
+\end{lstlisting}
+
+Available colours are \code{invisible}, \code{white}, \code{black}, \code{gray}, \code{red}, \code{darkred}, \code{green}, \code{blue}, \code{lightblue}, \code{darkblue}, \code{cyan}, \code{magenta}, \code{yellow}, \code{oxsteel}, and several house styles (\code{SCINT_style}, \code{MCP_style}, \dots); you may also colour by material name (\code{/musr/command visattributes G4_Cu red}). More can be added in \code{musrDetectorConstruction::SetColourOfLogicalVolume}.
+
+Overlap checking is on in this codebase: every placement is checked as it is created, and the log shows a line \code{Checking overlaps for volume ... OK!} for each. An overlap corrupts particle transport without any other symptom, so never ignore a failed check.
+
+\begin{checkbuild}
+If a placement reports an overlap, fix the geometry before trusting a single number from the run. The usual causes are a daughter larger than its mother, a forgotten half-length, or a position that pushes a daughter through a wall. Then look at it: \code{/control/execute visVRML.mac} before \code{/run/beamOn 5} writes a 3-D scene you can rotate in any VRML viewer.
+\end{checkbuild}
+
+\begin{recap}
+\begin{itemize}
+  \item \code{construct} fields, in order: solid, name, dimensions, material, \code{x y z}, \code{log_mother}, rotation, sensitivity, volumeID.
+  \item Box and tube dimensions are \emph{half}-lengths; positions are in the mother's local frame.
+  \item Rotations are axis--angle (four numbers) or Euler (three), defined before use.
+  \item \code{musr/ScintSD} plus a unique volumeID makes a counter; \code{det_ID} separates counters later.
+  \item The names \code{Target}, \code{M0}--\code{M2}, \code{*save*}, \code{kill*} and \code{shield*} trigger special behaviour.
+\end{itemize}
+\end{recap}
+\nextchap{the muon beam, its spin, and TURTLE input}

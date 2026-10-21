@@ -1,0 +1,116 @@
+\chapter{The muon beam and its spin}
+\label{ch:beam}
+
+\begin{willdo}
+\begin{itemize}
+  \item Configure the muon beam: species, vertex, spread, momentum and direction.
+  \item Set the muon spin --- the quantity that makes muon spin spectroscopy possible.
+  \item Control muon decay timing, and feed a realistic beam from a TURTLE file.
+  \item Know when to reach for the General Particle Source or a cosmic-ray generator instead.
+\end{itemize}
+\end{willdo}
+
+The \code{/gun/} commands define the primary particles: where they start, how they are spread in space and momentum, which way they point, and --- uniquely for muon work --- how their spins are oriented. This is the \muSR\ beam model built into \musrSim; it is richer than a generic particle gun because the physics of a muon beam demands it. Unlike \code{/musr/command} lines, \code{/gun} commands are ordinary Geant4 UI commands executed in order (Section~\ref{sec:tworeads}), so \code{ls /gun/} at an \code{Idle>} prompt lists them all.
+
+\section{Species, vertex, and spread}
+By default the beam is positive muons. The vertex is the mean starting point; the sigmas smear it.
+
+\begin{lstlisting}[style=mac,caption={A spatially spread beam (from \texttt{201.mac})}]
+# default is mu+; use mu- for negative muons, or e+, e-, proton, ...
+/gun/primaryparticle mu+
+# mean start point, in the world frame
+/gun/vertex 0 0 -1000 mm
+# Gaussian spread in x and y; 0 = sharp in z
+/gun/vertexsigma 25 25 0 mm
+# keep vertices within radius 100 mm (and the given z range)
+/gun/vertexboundary 100 -999999 999999 mm
+\end{lstlisting}
+
+A positive \code{vertexsigma} component draws that coordinate from a Gaussian of that standard deviation; a \emph{negative} value \(-s\) draws it uniformly in \([x_0-s,\,x_0+s]\); zero means no spread. \code{vertexboundary} rejects vertices outside a maximum radius and a \(z\) range, handy for forcing muons to originate inside a beam pipe.
+
+\section{Momentum and direction}
+Set the central momentum and its spread, and optionally tilt or focus the beam.
+
+\begin{lstlisting}[style=mac,caption={Momentum and beam optics}]
+# central momentum (MeV/c) and its Gaussian sigma
+/gun/momentum 100.0 MeV
+/gun/momentumsmearing 3.00 MeV
+# random angular divergence, and focusing proportional to the offset from the axis
+/gun/tiltsigma 0.15 0.15 0 deg
+/gun/pitch 0.08 deg
+\end{lstlisting}
+
+\code{/gun/kenergy} sets a kinetic energy instead of a momentum, and \code{/gun/momentumboundary} rejects momenta outside a window. \code{/gun/tilt} applies a fixed angle to every muon; \code{/gun/tiltsigma} gives a random Gaussian divergence; \code{/gun/pitch} applies an angle proportional to a muon's distance from the beam axis, so a positive pitch focuses the beam and a negative pitch defocuses it. To make the beam travel along a direction other than \(+z\), set \code{/gun/direction dx dy dz} (the vector need not be normalised); the vertex spread and tilt are rotated with it.
+
+\begin{physics}
+Two momentum regimes dominate \muSR. \emph{Surface muons} at \(\approx\)\,\SI{29.8}{MeV/c} stop in the first fraction of a millimetre of a sample --- ideal for thin samples. \emph{Decay-channel muons} at higher momenta, such as the \SI{100}{MeV/c} used in \code{201.mac}, penetrate deeper and suit bulky pressure cells. The momentum you choose is a physics decision about stopping depth, not a free knob.
+\end{physics}
+
+\section{The muon spin}
+This is the heart of the technique. A \muSR\ beam is almost fully spin-polarised, and the whole measurement is watching that polarisation evolve. Set the initial spin direction as a vector; it is normalised internally.
+
+\begin{lstlisting}[style=mac,caption={Spin anti-parallel to a $+z$ beam (the standard \muSR\ set-up)}]
+/gun/muonPolarizVector 0 0 -1
+/gun/muonPolarizFraction 1
+\end{lstlisting}
+
+\code{muonPolarizFraction} scales the degree of polarisation from 1 (fully aligned) through 0 (unpolarised: half the muons each way) to \(-1\) (fully anti-aligned). Surface muons are produced with their spin pointing opposite to their momentum, which is why a \(+z\) beam is paired with a \((0,0,-1)\) spin vector.
+
+\begin{keypoint}
+In a magnetic field the muon spin precesses, and \musrSim\ transports it correctly through the field as the muon flies and after it stops. The decay positron is emitted preferentially along the spin at the moment of decay. Recording the muon polarisation at decay (\code{muDecayPol...}) and the decay-positron direction (\code{posIniMom...}) is what lets you reconstruct an asymmetry signal in Chapter~\ref{ch:capstone}.
+\end{keypoint}
+
+\section{Decay timing}
+By default Geant4 handles the muon lifetime naturally, with the PDG mean life. \code{/gun/decaytimelimits} lets you force decays into a chosen time window instead.
+
+\begin{lstlisting}[style=mac,caption={Natural decay (the window is inactive because max $\le 0$)}]
+/gun/decaytimelimits -1 -1 2197.03 ns
+\end{lstlisting}
+
+The three numbers are the minimum time, maximum time and mean life. The window is used only when the maximum is positive: then every muon decays between min and max, following an exponential with the given mean life (or exactly at that time if min = max). With a non-positive maximum, as here, the line changes nothing --- it is kept in the examples as a visible reminder of the default. Forced windows are useful for technical studies and misleading for physics.
+
+\section{A realistic beam from TURTLE}
+For quantitative beamline work you often want a beam that matches a real beamline, produced by the TURTLE transport code. Point \musrSim\ at a TURTLE output file and it starts muons from it instead of generating them from the \code{/gun} distributions.
+
+\begin{lstlisting}[style=mac,caption={Driving the beam from a TURTLE file}]
+/gun/turtlefilename my_beamline.dat
+# z at which TURTLE exported the particles
+/gun/turtleZ0position -1000 mm
+/gun/turtleMomentumScalingFactor 1.0
+\end{lstlisting}
+
+If the run requests more muons than the file holds, the file is rewound; because the random seed keeps advancing, the reused lines yield statistically independent events. Helpers (\code{/gun/turtleInterpretAxes}, \code{/gun/turtleMomentumBite}, \code{/gun/turtleFirstEventNr}) adapt axis conventions, momentum spread and the starting line.
+
+\section{When to use the General Particle Source}
+For radioactive sources and other non-muon primaries, Geant4's General Particle Source (GPS) is more convenient. As soon as any line of your macro starts with \code{/gps/}, \musrSim\ switches to the GPS generator (and adds radioactive decay for ions) and ignores the \code{/gun/} beam.
+
+\begin{lstlisting}[style=mac,caption={A radioactive $^{90}$Sr source via GPS (from \texttt{102.mac})}]
+/gps/particle ion
+/gps/ion 38 90 0 0
+/gps/position 0 0 0
+/gps/energy 0 keV
+\end{lstlisting}
+
+\begin{pitfall}
+In Geant4~11, \code{/gps/ion} is refused unless \code{/gps/particle ion} comes first --- older macros that omit it stop with ``Illegal parameter''. And GPS and \code{/gun/} are mutually exclusive within a run: mixing them means your \code{/gun/} lines are silently ignored. For ordinary muon beams stay with \code{/gun/}.
+\end{pitfall}
+
+\section{Cosmic-ray muons}
+\begin{newin}
+For muography, shielding and detector cosmic tests, \musrSim\ now includes two cosmic-ray generators that replace the beam model:
+\begin{itemize}
+  \item \textbf{EcoMug} (\code{/gun/ecomug/...}) --- samples single sea-level muons on a plane, half-sphere or cylinder, with momentum and angle cuts;
+  \item \textbf{CRY} (\code{/gun/cry/...}) --- generates full cosmic-ray showers (muons, neutrons, protons, gammas, electrons, pions) for a chosen date, latitude and altitude.
+\end{itemize}
+Appendix~\ref{app:cosmics} shows the commands and the coordinate conventions; \code{run/EcoMugExample.mac} and \code{run/CRYExample.mac} are working starting points. In both, \(+z\) is vertical \emph{up}.
+\end{newin}
+
+\begin{recap}
+\begin{itemize}
+  \item \code{/gun/vertex} and \code{/gun/vertexsigma} set the start point and its spread; positive sigma is Gaussian, negative is uniform.
+  \item \code{/gun/momentum} with \code{tiltsigma}/\code{pitch} shapes the beam; momentum sets stopping depth.
+  \item \code{/gun/muonPolarizVector} sets the spin --- the observable at the centre of \muSR.
+  \item TURTLE files give realistic beams; GPS replaces \code{/gun/} for source decays; EcoMug and CRY give cosmic rays.
+\end{itemize}
+\end{recap}
+\nextchap{sensitive detectors, hits, and the ROOT tree}

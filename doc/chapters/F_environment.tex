@@ -1,0 +1,53 @@
+\chapter{Environment quick reference}
+\label{app:env}
+
+\eyebrow{Everything from conda-forge (tested)}
+\begin{lstlisting}[style=sh]
+conda create -n musrsim -c conda-forge geant4 root cmake make cxx-compiler expat
+conda activate musrsim
+pip install uproot awkward numpy scipy matplotlib
+\end{lstlisting}
+
+\eyebrow{CVMFS on a cluster}
+\begin{lstlisting}[style=sh]
+# one line gives a matching Geant4 + ROOT + compiler (pick your site's LCG release):
+source /cvmfs/sft.cern.ch/lcg/views/LCG_101/x86_64-centos7-gcc11-opt/setup.sh
+\end{lstlisting}
+
+\eyebrow{Build and run}
+\begin{lstlisting}[style=sh]
+git clone https://github.com/kimsiang/musrSim-upgrade.git
+cd musrSim-upgrade
+mkdir build
+cd build
+cmake ../            # add -DCMAKE_PREFIX_PATH=$CONDA_PREFIX if CMake mixes in system libraries
+make -j4             # -> build/musrSim ; run/ is copied to build/run/
+cd run
+mkdir data
+../musrSim 101.mac   # -> data/musrSim_jp101.root
+\end{lstlisting}
+
+\eyebrow{Command line}
+\begin{lstlisting}[style=sh]
+../musrSim <macro.mac> [name | idle] [seedOffset]
+#   name       -> output suffix: data/musrSim_jp<NNN>_<name>.root
+#   idle       -> interactive Geant4 prompt after the macro has run
+#   seedOffset -> used by /musr/run/randomOption 1 (independent batch jobs)
+\end{lstlisting}
+
+\eyebrow{Tutorial files in the repository}
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.42\textwidth} L@{}}
+\toprule
+\code{run/first_sim.mac} & Chapter~\ref{ch:macro}: muon beam into one scintillator slab.\\
+\code{run/tf_musr.mac} & Chapter~\ref{ch:capstone}: transverse-field asymmetry experiment.\\
+\code{doc/scripts/first_analysis.py} & Chapter~\ref{ch:python}: spectrum and lifetime fit.\\
+\code{doc/scripts/load.py} & Chapter~\ref{ch:python}: reusable loader.\\
+\code{doc/scripts/asymmetry.py} & Chapter~\ref{ch:capstone}: asymmetry and Larmor-frequency fit.\\
+\code{doc/scripts/make_figures.py} & Regenerates the figures in this book from the two runs.\\
+\bottomrule
+\end{tabularx}}
+
+\begin{checkbuild}
+CRY needs its data tables in \code{cryData/} (or \code{CRYDATAPATH}), but only if you use CRY; field-map files are needed only for macros that read them (\code{14510.mac}, \code{50121.mac}, the \code{LEM_*.mac} files): neither is shipped. Everything in this book runs without them.
+\end{checkbuild}

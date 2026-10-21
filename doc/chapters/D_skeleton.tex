@@ -1,0 +1,69 @@
+\chapter{An annotated skeleton macro}
+\label{app:skeleton}
+Copy this template and fill in the bracketed parts. It is ordered for readability --- geometry, physics, output, beam, go --- and keeps every \code{/musr/command} line in the one file you pass on the command line (Section~\ref{sec:tworeads}).
+
+\begin{lstlisting}[style=mac,caption={A reusable starting point for a new simulation}]
+# ================================================================
+# <name>.mac -- one-line description
+# /musr/command units: mm, deg, tesla, kV/mm, ns
+# ================================================================
+
+# ---- rotation matrices (define BEFORE the volumes that use them) ----
+# 90 deg about y
+/musr/command rotation rotA 0 1 0 90
+
+# ---- geometry (World first; mothers before daughters) ----
+/musr/command construct box World <hx> <hy> <hz> G4_AIR 0 0 0 no_logical_volume norot dead -1
+/musr/command construct <solid> Target <dims> <material> <x y z> log_World norot dead 5
+/musr/command construct box Counter1 <hx hy hz> G4_PLASTIC_SC_VINYLTOLUENE <x y z> log_World norot musr/ScintSD 1
+/musr/command construct box Counter2 <hx hy hz> G4_PLASTIC_SC_VINYLTOLUENE <x y z> log_World rotA musr/ScintSD 2
+
+# ---- appearance ----
+/musr/command visattributes log_World invisible
+/musr/command visattributes log_Target blue
+
+# ---- field (optional): six numbers, B in tesla then E in kV/mm ----
+# /musr/command globalfield F <hx hy hz> uniform 0 0 0 log_World <Bx> <By> <Bz> 0 0 0
+# /musr/command globalfield printFieldValueAtPoint 0 0 0
+
+# ---- physics (REQUIRED: without it nothing interacts) ----
+/musr/command process addDiscreteProcess gamma G4PhotoElectricEffect
+/musr/command process addDiscreteProcess gamma G4ComptonScattering
+/musr/command process addDiscreteProcess gamma G4GammaConversion
+/musr/command process addDiscreteProcess gamma G4RayleighScattering
+/musr/command process addProcess  e-  G4eMultipleScattering   -1  1  1
+/musr/command process addProcess  e-  G4eIonisation           -1  2  2
+/musr/command process addProcess  e-  G4eBremsstrahlung       -1  3  3
+/musr/command process addProcess  e+  G4eMultipleScattering   -1  1  1
+/musr/command process addProcess  e+  G4eIonisation           -1  2  2
+/musr/command process addProcess  e+  G4eBremsstrahlung       -1  3  3
+/musr/command process addProcess  e+  G4eplusAnnihilation      0 -1  4
+/musr/command process addProcess  mu+ G4MuMultipleScattering  -1  1  1
+/musr/command process addProcess  mu+ G4MuIonisation          -1  2  2
+/musr/command process addProcess  mu+ G4MuBremsstrahlung      -1  3  3
+/musr/command process addProcess  mu+ G4MuPairProduction      -1  4  4
+/musr/command process addProcess  mu- G4MuMultipleScattering  -1  1  1
+/musr/command process addProcess  mu- G4MuIonisation          -1  2  2
+/musr/command process addProcess  mu- G4MuBremsstrahlung      -1  3  3
+/musr/command process addProcess  mu- G4MuPairProduction      -1  4  4
+
+# ---- output ----
+/musr/command SetOutputFileName DEFAULT
+/musr/command storeOnlyEventsWithHits true
+# /musr/command rootOutput odet_ID off
+/musr/run/howOftenToPrintEvent 10000
+# for parallel production jobs:
+# /musr/run/randomOption 1
+
+# ---- beam ----
+/gun/primaryparticle mu+
+/gun/vertex 0 0 <z> mm
+/gun/vertexsigma <sx> <sy> 0 mm
+/gun/momentum <p> MeV
+/gun/muonPolarizVector 0 0 -1
+/gun/muonPolarizFraction 1
+
+# ---- go ----
+# /control/execute visVRML.mac
+/run/beamOn <N>
+\end{lstlisting}

@@ -1,0 +1,57 @@
+\chapter{Cosmic-ray muons: EcoMug and CRY}
+\label{app:cosmics}
+Muography, shielding studies and detector cosmic tests need primaries that follow the sea-level cosmic-ray distribution rather than a beam. \musrSim\ includes two generators for this, plus a simple legacy option. Each replaces the \code{/gun} beam model for the whole run.
+
+\begin{keypoint}
+In both generators \(+z\) is \emph{vertical up}: particles start on a horizontal surface and travel downward (\(p_z<0\)). Build your geometry with the sky at the top --- for example, a building or overburden above a detector at negative \(z\). The generated particle's start values are stored in the \code{parIni...} branches and its PDG code in \code{parID} (\(\mu^-=13\), \(\mu^+=-13\)); the \code{muIni...} branches are not filled.
+\end{keypoint}
+
+\section{EcoMug}
+EcoMug (D.~Pagano \emph{et al.}) is a fast, header-only generator of single cosmic muons using a parametrised sea-level spectrum. It is in \code{include/EcoMug.h}.
+
+\begin{lstlisting}[style=mac,caption={EcoMug on a \SI{5}{m}\,\(\times\)\,\SI{5}{m} plane (from \texttt{run/EcoMugExample.mac})}]
+/gun/ecomug/useEcoMug true
+# shape: plane <sizeX sizeY> <centre x y z>  -- all in mm
+/gun/ecomug/shapeConstruct plane 5000 5000 0 0 0
+# constraints: pMin pMax [MeV/c]  zenithMin zenithMax [deg]  azimuthMin azimuthMax [deg]
+/gun/ecomug/constraints 10 10000 20 60 0 180
+\end{lstlisting}
+
+The generation surface can be a \code{plane} (\code{<sizeX sizeY cx cy cz>}), a half-\code{sphere} (\code{<radius 0 cx cy cz>}) or a \code{cylinder} (\code{<radius height cx cy cz>}); \code{shapeConstruct} always takes five numbers. The defaults are a \SI{1}{m} square plane at the origin, full momentum range, zenith 0--\ang{90} and azimuth 0--\ang{360}. Running the example as shipped produced muons on the \(z=0\) plane within \(\pm\SI{2.5}{m}\), all heading downward, with zenith angles between \ang{20} and \ang{60}, and both charges.
+
+\begin{checkbuild}
+\code{EcoMugExample.mac} switches off almost every branch, including \code{parIni...}, to show the generator alone. Delete those \code{rootOutput ... off} lines when you want to see the generated muons in the tree.
+\end{checkbuild}
+
+\section{CRY}
+CRY (Lawrence Livermore National Laboratory) generates complete cosmic-ray \emph{showers} --- muons, neutrons, protons, photons, electrons and pions --- with correlated multiplicities, for a chosen date (solar cycle), latitude and altitude. One \musrSim\ event is one shower. The library is compiled in from \code{src_cry/}.
+
+\begin{lstlisting}[style=mac,caption={CRY: muons only, sea level, \SI{5}{m} sub-box (from \texttt{run/CRYExample.mac})}]
+/gun/cry/useCRY true
+/gun/cry/input returnMuons 1
+/gun/cry/input returnNeutrons 0
+/gun/cry/input returnProtons 0
+/gun/cry/input returnGammas 0
+/gun/cry/input returnElectrons 0
+/gun/cry/input returnPions 0
+/gun/cry/input date 7-1-2012
+/gun/cry/input latitude 90.0
+/gun/cry/input altitude 0
+/gun/cry/input subboxLength 5
+/gun/cry/update
+# alternatively, read the same key-value pairs from a file:
+# /gun/cry/file CRYSetup.file
+\end{lstlisting}
+
+Each \code{/gun/cry/input} line adds one key--value pair; \code{/gun/cry/update} must follow before \code{/run/beamOn}. \code{subboxLength} (metres) sets the side of the square area on which CRY places particles; altitude is in metres (CRY supports 0, 2100 and 11300). See the CRY manual for all keys.
+
+\begin{pitfall}
+CRY needs its data tables (\code{cosmics_*.data}), which are not in the repository. Copy the \code{data/} files of the CRY distribution into \code{cryData/} at the top of the repository (the default path compiled into \musrSim), or point to them at run time with \code{export CRYDATAPATH=/path/to/cry/data}. Without them the run stops with \code{CRY::CRYData: Error reading .../cosmics_0.data}.
+\end{pitfall}
+
+\section{Legacy option}
+\code{/gun/cosmic_v1 true} draws each primary's energy and its angle to the gun axis from a simple built-in cosmic-muon distribution (\code{cosmicMuonManager}, written by M.~Lv), with uniform azimuth, while keeping the \code{/gun} vertex settings. Unlike EcoMug and CRY it works in the beam frame: the muons travel along \(+z\), not downward. EcoMug supersedes it for new work; the examples set it to \code{false}.
+
+\section{References}
+D.~Pagano, G.~Bonomi, A.~Donzella, A.~Zenoni, G.~Zumerle, N.~Zurlo, ``EcoMug: an Efficient COsmic MUon Generator for cosmic-ray muon applications,'' \emph{Nucl.\ Instrum.\ Meth.\ A} \textbf{1014} (2021) 165732.\\
+C.~Hagmann, D.~Lange, D.~Wright, ``Cosmic-ray shower generator (CRY) for Monte Carlo transport codes,'' \emph{IEEE Nuclear Science Symposium Conference Record} (2007) 1143--1146.

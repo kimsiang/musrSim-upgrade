@@ -1,0 +1,134 @@
+\chapter{Hits and the ROOT output tree}
+\label{ch:output}
+
+\begin{willdo}
+\begin{itemize}
+  \item Understand what a ``hit'' is and how many appear per event.
+  \item Navigate the \code{t1} tree: event-level scalars versus per-hit arrays.
+  \item Select a specific detector with \code{det_ID} --- the key analysis idiom.
+  \item Control which branches are written, and which events are kept.
+\end{itemize}
+\end{willdo}
+
+When a particle deposits energy in a \code{musr/ScintSD} volume, \musrSim\ records a \emph{hit}. All the hits and muon information for one event become one entry in a ROOT tree named \code{t1}. Understanding the shape of that tree is the whole game: get it right and analysis (Chapter~\ref{ch:python}) is a few lines of Python.
+
+\section{What a hit is}
+A single event can produce several hits: more than one detector may fire, and one detector may fire more than once. Energy deposited in the same detector is summed into one hit as long as it arrives within the \emph{signal separation time} (default \SI{100}{ns}, set with \code{/musr/command signalSeparationTime <ns>}); a later deposit starts a new hit. That is why, in \code{first_sim.mac}, each stopping muon gives one prompt hit and its decay positron, microseconds later, a second one (Figure~\ref{fig:edep}).
+
+\musrSim\ therefore stores hits as \emph{parallel arrays}, all of the same length \code{det_n}, the number of hits in that event. Hit \(i\) is described by \code{det_ID[i]}, \code{det_edep[i]}, \code{det_time_start[i]}, and so on.
+
+\begin{center}
+\begin{tikzpicture}[node distance=6mm and 10mm]
+  \node[hot,minimum width=26mm] (sc) {\textbf{scintillator}\\(\texttt{musr/ScintSD})};
+  \node[box,right=12mm of sc,minimum width=36mm] (h) {\textbf{hit \(i\)}: \texttt{det\_ID},\\\texttt{det\_edep}, \texttt{det\_time\_start}, \dots};
+  \node[box,right=of h,minimum width=34mm,draw=eblue] (row) {\textbf{one row of \texttt{t1}}\\(all hits + muon info\\for this event)};
+  \draw[arr] ([xshift=-16mm,yshift=4mm]sc.west) node[left,font=\sffamily\scriptsize,text=navy]{\(\mu^+\) / \(e^+\)} -- ([yshift=4mm]sc.west);
+  \draw[arr] (sc)--(h); \draw[arr] (h)--(row);
+\end{tikzpicture}
+\end{center}
+
+\section{The shape of tree \texttt{t1}}
+The branches fall into two groups. \emph{Event-level scalars} carry one value per event; \emph{hit arrays} carry \code{det_n} values per event. The most useful of each:
+
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.36\textwidth} L@{}}
+\toprule
+\multicolumn{2}{@{}l}{\textbf{Event-level scalars (one per event)}}\\
+\midrule
+\code{runID}, \code{eventID} & Run and event identifiers.\\
+\code{weight} & Event weight (for re-weighted studies).\\
+\code{muIniPosX/Y/Z}, \code{muIniMomX/Y/Z} & Initial muon position (mm) and momentum (MeV/c).\\
+\code{muIniPolX/Y/Z} & Initial muon polarisation (spin).\\
+\code{muDecayDetID} & volumeID of the volume the muon decayed in (\(-1\) for the world).\\
+\code{muDecayTime} & Decay time in \si{\micro s} --- the muon-lifetime clock.\\
+\code{muDecayPosX/Y/Z}, \code{muDecayPolX/Y/Z} & Position and spin at the moment of decay.\\
+\code{muTargetTime}, \code{muTargetPolX/Y/Z} & Muon time and spin on entering a \code{Target} volume (only if one exists).\\
+\code{muM0Time}, \code{muM0PolX/Y/Z} & Same, on entering an \code{M0} counter (also \code{M1}, \code{M2}).\\
+\code{posIniMomX/Y/Z} & Initial momentum of the decay positron.\\
+\midrule
+\multicolumn{2}{@{}l}{\textbf{Hit arrays (length \code{det_n})}}\\
+\midrule
+\code{det_n} & Number of hits in this event.\\
+\code{det_ID[]} & Which detector each hit is in (your volumeID).\\
+\code{det_edep[]} & Energy deposited in each hit (MeV).\\
+\code{det_edep_el/pos/gam/mup/mun[]} & That energy split by \(e^-\), \(e^+\), \(\gamma\), \(\mu^+\), \(\mu^-\).\\
+\code{det_time_start[]}, \code{det_time_end[]} & Start and end time of each hit (\si{\micro s}).\\
+\code{det_x/y/z[]} & Position of the first step of each hit (mm).\\
+\code{det_Vrtx...[]} & Provenance of the depositing particle: vertex position, volume, process, track and particle ID.\\
+\bottomrule
+\end{tabularx}}
+
+\begin{keypoint}
+With default settings the tree has about 80 branches; naming a volume \code{Target}, adding \code{save} planes or enabling optical photons adds whole families (\code{muTarget...}, \code{save_...}, \code{odet_...}), up to a few hundred. You do not need most of them. For a typical positron-counter analysis four branches carry the physics: \code{det_n}, \code{det_ID}, \code{det_edep} and \code{det_time_start}, plus \code{muDecayTime} for lifetimes. Appendix~\ref{app:branches} lists them all.
+\end{keypoint}
+
+\begin{pitfall}
+A value of \(-1000\) (sometimes \(-999\)) is \musrSim's ``not defined for this event'' marker, not a measurement: \code{muTargetTime} is \(-1000\) when the muon never reached the sample, and the muon branches stay \(-1000\) when the primary is not a muon. Always cut these sentinel values before histogramming or fitting.
+\end{pitfall}
+
+\section{Selecting a detector with \texttt{det\_ID}}
+Because every counter writes into the same \code{det_edep} array, you isolate one counter by selecting on its \code{det_ID}. This single idiom underlies nearly all \musrSim\ analysis. In a ROOT session on the output of \code{201.mac}:
+
+\begin{lstlisting}[style=cpp,caption={Per-detector spectra in ROOT, selected by \texttt{det\_ID}}]
+root -l data/musrSim_jp201.root
+root [0] t1->Draw("det_edep", "det_ID==1")                // backward counter B1
+root [1] t1->Draw("det_edep", "det_ID==11")               // forward counter F1
+root [2] t1->Draw("muDecayTime", "muDecayDetID==201")     // muons that died in the target
+root [3] t1->Scan("det_ID:det_edep:det_time_start", "", "colsize=12")
+\end{lstlisting}
+
+The second argument to \code{Draw} is a selection evaluated \emph{per hit}, so \code{"det_ID==11"} keeps only hits in the counter you labelled~11.
+
+\section{Controlling the output}
+Two kinds of control matter: which events are saved, and which branches are written.
+
+\textbf{Which events.} By default only events with at least one detector hit are kept, since empty events cannot contribute to a real measurement. You can change this:
+
+\begin{lstlisting}[style=mac,caption={Event-selection switches (pick what you need)}]
+# default true: keep only events with a hit in any detector
+/musr/command storeOnlyEventsWithHits true
+# keep only events with a hit in detector 11
+/musr/command storeOnlyEventsWithHitInDetID 11
+# keep only events whose muon decayed in volume 201
+/musr/command storeOnlyEventsWithMuonsDecayedInDetID 201
+\end{lstlisting}
+
+(\code{storeOnlyTheFirstTimeHit true} also exists; it stops each track at its first hit and is meant for special studies only.)
+
+\textbf{Which branches.} Trim the tree by switching branches off; \code{201.mac} does this for the optical and vertex families it does not need. A few branches are off by default and must be switched \emph{on}:
+
+\begin{lstlisting}[style=mac,caption={Pruning unused branches keeps files small and fast}]
+/musr/command rootOutput odet_ID off
+/musr/command rootOutput det_VvvKine off
+# off by default -- switch on if needed (fills BxIntegral)
+/musr/command rootOutput fieldIntegralBx on
+\end{lstlisting}
+
+\begin{checkbuild}
+The switch name is usually the branch name, but not always: \code{det_start}/\code{det_end} control \code{det_time_start}/\code{det_time_end}, and \code{fieldIntegralBx} fills \code{BxIntegral}. Only the field integrals, \code{phot_time}, \code{odet_timeC1} and \code{odet_timeCFDarray} accept \code{on}. When unsure, search \code{musrDetectorConstruction.cc} for \code{"rootOutput"}.
+\end{checkbuild}
+
+\textbf{Naming the file.} The output path is \code{<dir>/musrSim_jp<NNN>[_<name>].root}. \code{<NNN>} is the leading integer of the macro's file name, zero-padded to three digits; \code{<name>} comes from the second command-line argument or, if none is given, from \code{SetOutputFileName}; \code{<dir>} is \code{data} unless you change it.
+
+\begin{lstlisting}[style=mac,caption={Naming the ROOT file from inside the macro}]
+# -> data/musrSim_jp<NNN>.root
+/musr/command SetOutputFileName DEFAULT
+# or give a suffix: -> data/musrSim_jp<NNN>_myRun.root
+# /musr/command SetOutputFileName myRun
+# write somewhere other than data/ (the directory must exist)
+# /musr/command rootOutputDirectoryName /scratch/me/sims
+\end{lstlisting}
+
+\begin{tip}
+Prune first, simulate second. Deciding which branches you need before a million-event run can shrink the output several-fold and speed up both writing and later reading. You can always switch a branch back on and re-run a small job to check it.
+\end{tip}
+
+\begin{recap}
+\begin{itemize}
+  \item One stored event \(\rightarrow\) one entry in tree \code{t1}; hits are parallel arrays of length \code{det_n}, split in time by \code{signalSeparationTime}.
+  \item Event-level scalars (\code{muDecayTime}, \code{muIniPol...}) versus per-hit arrays (\code{det_edep[]}).
+  \item Isolate a counter by selecting on \code{det_ID}; cut the \(-1000\) sentinels.
+  \item \code{storeOnly...} chooses which events are kept; \code{rootOutput <branch> off} prunes the tree.
+\end{itemize}
+\end{recap}
+\nextchap{analysing the tree in Python}

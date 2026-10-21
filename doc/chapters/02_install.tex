@@ -1,0 +1,163 @@
+\chapter{Installation and first light}
+\label{ch:install}
+
+\begin{willdo}
+\begin{itemize}
+  \item Install the dependencies: Geant4, ROOT, CMake and a C++ compiler.
+  \item Get the \texttt{musrSim-upgrade} source and build the \musrSim\ executable.
+  \item Run the bundled \code{101.mac} and confirm you get a ROOT file.
+  \item Look at the geometry in a 3-D viewer.
+\end{itemize}
+\end{willdo}
+
+\section{What you need}
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}l l L@{}}
+\toprule
+\textbf{Component} & \textbf{Version} & \textbf{Role}\\
+\midrule
+Geant4 & 11.x (tested 11.4.3); 10.7 also works & Particle transport engine \\
+ROOT & 6.x (tested 6.40) & Output format and C++ analysis \\
+CMake & \(\ge\) 3.16 (CMake 4 is fine) & Build system \\
+C++ compiler & GCC \(\ge\) 9 or Clang \(\ge\) 12 & C++17 or newer --- the build follows ROOT's standard \\
+Python (analysis) & \(\ge\) 3.9 & \code{uproot}, \code{awkward}, \code{numpy}, \code{scipy}, \code{matplotlib} \\
+\bottomrule
+\end{tabularx}}
+
+\section{The fastest path: one conda environment}
+\label{sec:conda}
+conda-forge ships Geant4 (with its data sets), ROOT, CMake and a compiler as one consistent set. This is how the reference runs in this book were made:
+
+\begin{lstlisting}[style=sh,caption={Geant4 + ROOT + toolchain from conda-forge (use \texttt{mamba} or \texttt{micromamba} the same way)}]
+conda create -n musrsim -c conda-forge geant4 root cmake make cxx-compiler expat
+conda activate musrsim
+geant4-config --version      # e.g. 11.4.3
+root-config --version        # e.g. 6.40.04
+\end{lstlisting}
+
+Activating the environment also sets the Geant4 data-set variables, so there is nothing else to source. Add the Python analysis packages to the same environment (Chapter~\ref{ch:python}):
+
+\begin{lstlisting}[style=sh,caption={Analysis packages}]
+pip install uproot awkward numpy scipy matplotlib
+\end{lstlisting}
+
+\begin{tip}
+On a cluster with CVMFS you can skip installing anything: source a CERN LCG view that bundles Geant4, ROOT and a compiler, for example \code{source /cvmfs/sft.cern.ch/lcg/views/LCG_101/x86_64-centos7-gcc11-opt/setup.sh}. Pick a newer LCG release if your site has one.
+\end{tip}
+
+\section{Installing the dependencies yourself}
+\subsection{Linux (Ubuntu/Debian)}
+Install the system libraries Geant4 needs, then build Geant4 from source. ROOT is easiest from the official binaries at \url{root.cern/install}.
+
+\begin{lstlisting}[style=sh,caption={System build dependencies}]
+sudo apt-get update
+sudo apt-get install -y build-essential cmake \
+     libxerces-c-dev libexpat1-dev \
+     libgl1-mesa-dev libglu1-mesa-dev libxmu-dev libxi-dev \
+     qt6-base-dev
+\end{lstlisting}
+
+\begin{lstlisting}[style=sh,caption={Build Geant4 11 from source}]
+# after downloading and unpacking geant4-v11.x from geant4.web.cern.ch:
+cd geant4-v11.4.3
+mkdir build && cd build
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/geant4-install \
+      -DGEANT4_USE_OPENGL_X11=ON -DGEANT4_USE_QT=ON \
+      -DGEANT4_INSTALL_DATA=ON ..
+make -j$(nproc)
+make install
+\end{lstlisting}
+
+\begin{pitfall}
+Note \code{mkdir build && cd build} --- the \code{&&} chains the two commands. Writing ``\code{mkdir build} and \code{cd build}'' is not shell syntax. This is a real error we have seen copied from notes.
+\end{pitfall}
+
+\subsection{macOS}
+ROOT and the build tools come from Homebrew; Geant4 is not in Homebrew core, so build it from source as above --- or simply use the conda environment of Section~\ref{sec:conda}, which works the same on macOS.
+
+\begin{lstlisting}[style=sh,caption={macOS: tools via Homebrew, Geant4 from source}]
+brew install cmake root xerces-c qt
+# then build Geant4 11 from source as in the Linux section
+\end{lstlisting}
+
+\subsection{Make the environments available}
+For a self-built toolchain, add these to your \code{~/.bashrc} or \code{~/.zshrc}:
+
+\begin{lstlisting}[style=sh,caption={Shell environment for a self-built Geant4 and a ROOT binary}]
+source $HOME/geant4-install/bin/geant4.sh    # Geant4 libraries + data sets
+source /path/to/root/bin/thisroot.sh         # ROOT
+\end{lstlisting}
+
+\begin{pitfall}
+There is no \code{geant4} command and no \code{geant4 --version}. Geant4 exposes its settings through \code{geant4-config} (CMake uses it to find the libraries). If \code{geant4-config} is not found, the environment is not set up.
+\end{pitfall}
+
+\section{Get and build \musrSim}
+\begin{lstlisting}[style=sh,caption={Clone and build \texttt{musrSim-upgrade}}]
+git clone https://github.com/kimsiang/musrSim-upgrade.git
+cd musrSim-upgrade
+mkdir build
+cd build
+cmake ../        # finds Geant4 and ROOT from your environment
+make -j4         # produces the executable build/musrSim
+\end{lstlisting}
+
+\code{cmake} also copies every file in \code{run/} --- the example macros, field maps and setup files --- into \code{build/run/}, which is where you run from. If you edit a macro in \code{run/}, re-run \code{cmake ../} (or simply edit the copy in \code{build/run/}).
+
+\begin{tip}
+Build out of source: a separate \code{build/} directory keeps generated files away from the code, so \code{git status} stays clean and \code{rm -rf build} always gives you a fresh start.
+\end{tip}
+
+\section{First light: run the bundled example}
+\begin{lstlisting}[style=sh,caption={Run your first simulation}]
+cd run           # i.e. build/run
+mkdir data       # output goes to data/ ; it must exist!
+../musrSim 101.mac
+\end{lstlisting}
+
+You will see Geant4 print its banners, the physics processes being defined, the list of volumes with overlap checks, and finally a summary like \code{Number of events = 5}. The run writes \code{data/musrSim_jp101.root}.
+
+\begin{keypoint}
+Output goes to \code{data/musrSim_jp<NNN>[_<name>].root}, where \code{<NNN>} is the leading integer of the macro's file name, zero-padded to three digits (\code{101.mac} \(\rightarrow\) \code{jp101}; \code{first_sim.mac} has no number \(\rightarrow\) \code{jp000}). The \code{data/} directory must already exist: without it the run stops with \code{!!!FATAL!!! ... Root output file ... can not be created}.
+\end{keypoint}
+
+\begin{hood}
+The command line is \code{musrSim <macro> [name|idle] [seedOffset]}. Argument~1 is the macro. Argument~2, if given, becomes the \code{_<name>} suffix of the output file --- except the special word \code{idle}, which instead drops you into an interactive Geant4 prompt once the macro has finished. Argument~3 is a random-seed offset for batch jobs (Section~\ref{sec:scale}). Run without arguments, \musrSim\ only prints this usage line.
+\end{hood}
+
+\code{101.mac} simulates five muons and stores only events with a hit in detector~11, so its tree holds a single entry --- enough to prove the chain works. Chapter~\ref{ch:macro} builds a macro of your own.
+
+\section{See the geometry}
+A simulation you cannot see is a simulation you cannot trust. The repository ships visualisation macros you call from inside a steering macro, just before \code{/run/beamOn}:
+
+\begin{lstlisting}[style=mac,caption={Write a VRML scene of the geometry and the first trajectories}]
+/control/execute visVRML.mac
+/run/beamOn 5
+\end{lstlisting}
+
+\code{visVRML.mac} opens Geant4's \code{VRML2FILE} driver, which writes \code{g4_00.wrl} (one file per run) for any VRML viewer. For a live OpenGL or Qt window instead, copy it and change its first line to \code{/vis/open OGL} or \code{/vis/open TSG_QT_GLES}; this needs a Geant4 built with those drivers. Keep \code{/run/beamOn} small whenever visualisation is on --- every trajectory is stored. We return to visualisation in Chapter~\ref{ch:geometry}.
+
+\section{Troubleshooting the build}
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.38\textwidth} L@{}}
+\toprule
+\textbf{Symptom} & \textbf{Fix}\\
+\midrule
+\code{Could NOT find Geant4} & Activate the conda environment or source \code{geant4.sh}; or pass \code{-DGeant4_DIR=<prefix>/lib/cmake/Geant4}.\\
+\code{root-config} not found & Source \code{thisroot.sh} (or activate the environment) before \code{cmake}; \musrSim\ finds ROOT through \code{root-config}.\\
+\code{Could NOT find EXPAT: Found unsuitable version} & CMake picked up an old system \code{libexpat}. Install \code{expat} in the conda environment and configure with \code{cmake -DCMAKE_PREFIX_PATH=$CONDA_PREFIX ../}.\\
+Compile errors about missing Geant4 classes & You are on a fork older than \texttt{musrSim-upgrade}; pull the current code, which builds on Geant4 10.7--11.x.\\
+Runs, but stops with \code{Root output file ... can not be created} & The \code{data/} directory does not exist where you launched. \code{mkdir data}.\\
+Viewer window never opens & Your Geant4 was built without OpenGL/Qt; use \code{visVRML.mac}, or rebuild Geant4 with \code{-DGEANT4_USE_QT=ON}.\\
+\bottomrule
+\end{tabularx}}
+
+\begin{recap}
+\begin{itemize}
+  \item One conda-forge environment gives a matching Geant4 + ROOT + compiler; CVMFS gives it for free on clusters.
+  \item Build out of source: \code{cmake ../} then \code{make -j4} produces \code{build/musrSim} and copies \code{run/} to \code{build/run/}.
+  \item Run \code{../musrSim <macro>} from \code{build/run}; create \code{data/} first; output is \code{data/musrSim_jp<NNN>.root}.
+  \item \code{/control/execute visVRML.mac} before \code{/run/beamOn} gives you a 3-D picture.
+\end{itemize}
+\end{recap}
+\nextchap{the macro language, and your first macro from scratch}

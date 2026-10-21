@@ -1,0 +1,54 @@
+\chapter{ROOT output branch reference}
+\label{app:branches}
+The tree is named \code{t1}. Per-hit arrays all have length \code{det_n}. Positions are in mm, times in \si{\micro s}, energies in MeV and momenta in MeV/c unless noted; \(-1000\) marks ``undefined''. Switch off what you do not need with \code{rootOutput <switch> off}; the switch name differs from the branch name where noted.
+
+\eyebrow{Event level (one value per event)}
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.42\textwidth} L@{}}
+\toprule
+\code{runID}, \code{eventID}, \code{weight} & Identifiers and event weight.\\
+\code{timeToNextEvent} & For continuous-beam studies (\code{/gun/meanarrivaltime}).\\
+\code{BFieldAtDecay} & \(B_x,B_y,B_z,E_x,E_y,E_z\) at the muon decay point.\\
+\code{muIniTime}, \code{muIniPosX/Y/Z} & Muon start time and position.\\
+\code{muIniMomX/Y/Z}, \code{muIniPolX/Y/Z} & Muon initial momentum and polarisation.\\
+\code{parIniTime}, \code{parIniPosX/Y/Z}, \code{parIniMomX/Y/Z}, \code{parID} & Primary-particle start values (any species; filled by EcoMug and CRY).\\
+\code{muDecayDetID}, \code{muDecayTime} & Volume of decay (volumeID) and decay time.\\
+\code{muDecayPosX/Y/Z}, \code{muDecayPolX/Y/Z} & Position and spin at decay.\\
+\code{muTargetTime}, \code{muTargetPolX/Y/Z}, \code{muTargetMomX/Y/Z} & On entering a \code{Target} volume (only when one exists).\\
+\code{muM0Time}, \code{muM0PolX/Y/Z} (also \code{M1}, \code{M2}) & On entering \code{M0}--\code{M2} counters (only when they exist).\\
+\code{posIniMomX/Y/Z}, \code{elIniMomX/Y/Z} & Initial momentum of the decay positron / electron.\\
+\code{nFieldNomVal}, \code{fieldNomVal} & Nominal values of the defined field elements.\\
+\code{BxIntegral}, \code{ByIntegral}, \code{BzIntegral}, \code{BzIntegral1..3} & Field path integrals; off by default (switches \code{fieldIntegralBx}, \dots).\\
+\code{nOptPhot}, \code{nOptPhotDet}, \code{phot_time} & Optical-photon counts and times (optical runs only).\\
+\bottomrule
+\end{tabularx}}
+
+\eyebrow{Detector hits (arrays of length det\_n)}
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.42\textwidth} L@{}}
+\toprule
+\code{det_n} & Number of hits this event.\\
+\code{det_ID} & Detector volumeID of each hit.\\
+\code{det_edep} & Total energy deposited per hit.\\
+\code{det_edep_el/pos/gam/mup/mun} & Deposit by \(e^-\), \(e^+\), \(\gamma\), \(\mu^+\), \(\mu^-\).\\
+\code{det_kine_mup/mun} & Kinetic energy of the \(\mu^\pm\) at its step in the hit.\\
+\code{det_time_start}, \code{det_time_end} & Hit start and end time (switches \code{det_start}, \code{det_end}).\\
+\code{det_x/y/z}, \code{det_x/y/z_mup}, \code{det_x/y/z_mun} & First-step position of the hit, and of the \(\mu^\pm\) in it.\\
+\code{det_nsteps}, \code{det_length}, \code{det_kine} & Step count, path length, kinetic energy of the first particle.\\
+\code{det_VrtxKine}, \code{det_VrtxX/Y/Z}, \code{det_VrtxVolID}, \code{det_VrtxProcID}, \code{det_VrtxTrackID}, \code{det_VrtxPrtTrackID}, \code{det_VrtxParticleID} & Provenance of the depositing particle: its creation vertex, volume, process, track, parent track and particle type.\\
+\code{det_Vvv...} (same set) & The same provenance traced one step further back, to an ancestor of the depositing particle (see \code{musrScintSD.cc} for the exact rule).\\
+\bottomrule
+\end{tabularx}}
+
+\eyebrow{Tracking planes and optical detectors (only when used)}
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.42\textwidth} L@{}}
+\toprule
+\code{save_n}, \code{save_detID}, \code{save_particleID} & Crossings recorded by \code{*save*} volumes.\\
+\code{save_ke}, \code{save_time}, \code{save_x/y/z}, \code{save_px/py/pz} & Kinematics at the plane.\\
+\code{save_polx/poly/polz} & Spin at the plane.\\
+\code{odet_n}, \code{odet_ID}, \code{odet_nPhot}, \code{odet_nPhotPrim} & Per optical detector: photon counts.\\
+\code{odet_timeFirst/Second/Third}, \code{odet_timeA..D}, \code{odet_timeMean}, \code{odet_timeLast} & Photon arrival-time estimators.\\
+\code{odet_timeCFD}, \code{odet_amplCFD}, \code{odet_timeC1..}, \code{odet_timeCFDarray} & Simulated signal (OPSA): constant-fraction timing and amplitude.\\
+\bottomrule
+\end{tabularx}}

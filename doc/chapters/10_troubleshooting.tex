@@ -1,0 +1,95 @@
+\chapter{Troubleshooting, and reading the source}
+\label{ch:trouble}
+
+\begin{willdo}
+\begin{itemize}
+  \item Diagnose the common build, run-time and analysis failures quickly.
+  \item Turn ``unknown keyword'' into a ten-second source lookup.
+  \item Know which source file answers which kind of question.
+  \item Build the validation habits that keep simulated numbers trustworthy.
+\end{itemize}
+\end{willdo}
+
+\musrSim\ is a forked, evolving codebase, so the most valuable long-term skill is not memorising commands but knowing how to interrogate your own copy. This short chapter is a field guide to doing exactly that.
+
+\section{Common failures at a glance}
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.38\textwidth} L@{}}
+\toprule
+\textbf{Symptom} & \textbf{Most likely cause and fix}\\
+\midrule
+Build: \code{Could NOT find Geant4} / \code{root-config} missing & Environment not set up. Activate the conda environment, or source \code{geant4.sh} and \code{thisroot.sh}, before \code{cmake}.\\
+Build: \code{unsuitable version} of EXPAT or another library & CMake mixed system and conda libraries. Configure with \code{-DCMAKE_PREFIX_PATH=$CONDA_PREFIX}.\\
+Run stops: \code{Root output file ... can not be created} & No \code{data/} directory where you launched. \code{mkdir -p data}.\\
+Run stops: \code{Unknown keyword requested} & A \code{/musr/command} keyword your build does not implement, or a typo. Look it up (Section~\ref{sec:rejected}).\\
+Run stops: \code{not implemented in musrPhysicsList.cc} & A process name the physics list does not know (Section~\ref{sec:physics}).\\
+Run stops: \code{Logical Volume "..." not found} & Mother written without \code{log_}, misspelled, or constructed after the daughter.\\
+Run stops: \code{Field map file not found} & The map is not in \code{build/run}; put it in \code{run/} and re-run \code{cmake ../}.\\
+Tree is empty, or muons never stop & No physics block in the macro (Section~\ref{sec:physicsblock}), or nothing reaches a sensitive volume.\\
+Geometry or physics lines ignored & They are in a file pulled in with \code{/control/execute}; \code{/musr/command} lines must be in the main macro (Section~\ref{sec:tworeads}).\\
+Overlap reported during construction & A daughter exceeds or intersects its mother, or a half-length is wrong (Chapter~\ref{ch:geometry}).\\
+Parallel jobs give identical results & Seeding: use \code{/musr/run/randomOption 1} with a different offset per job (Section~\ref{sec:scale}).\\
+Histogram spikes at \(-1000\) & Uncut sentinel values (Chapter~\ref{ch:output}).\\
+Fit returns nonsense & Jagged array flattened before masking, or starved bins at late time (Chapter~\ref{ch:python}).\\
+\bottomrule
+\end{tabularx}}
+
+\section{When a command is rejected}
+\label{sec:rejected}
+For \code{/musr/command} lines, \musrSim\ prints \code{E R R O R ... Unknown keyword requested} with the offending line and stops. For \code{/gun}, \code{/musr/run} and Geant4 commands, Geant4 reports \code{command not found} and interrupts the batch. Either way the command does not exist in your build --- do not fight it; find out what does exist:
+
+\begin{lstlisting}[style=sh,caption={Confirm a command against your own source}]
+# 1. UI commands (/gun, /musr/run, Geant4): ask the running executable
+../musrSim first_sim.mac idle      # then: ls /gun/   help /gun/vertexsigma
+
+# 2. /musr/command keywords: grep the parsers
+grep -n '"storeOnlyEventsWithHits"' src/musrDetectorConstruction.cc
+grep -n '"globalfield"'             src/musrDetectorConstruction.cc
+grep -n 'stringProcessName=='       src/musrPhysicsList.cc
+\end{lstlisting}
+
+The grep tells you instantly whether the keyword is implemented, and the \code{sscanf} a few lines below the match tells you its exact argument order --- more reliable than any manual, including this one.
+
+\section{A map of the source}
+You do not need to read the whole codebase. A handful of files answer almost every question.
+
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.4\textwidth} L@{}}
+\toprule
+\textbf{File} & \textbf{Answers questions about}\\
+\midrule
+\code{musrSim.cc} & Start-up, command-line arguments, run modes, output-name pre-scan, the order of initialisation.\\
+\code{src/musrDetectorConstruction.cc} & Every \code{/musr/command} keyword except \code{process}: solids, rotations, materials, \code{globalfield}, \code{rootOutput}, \code{visattributes}, the magic volume names.\\
+\code{src/musrPhysicsList.cc} & \code{/musr/command process ...}: which processes exist and how they are added.\\
+\code{src/musrRootOutput.cc} & Every ROOT branch: names, types, units and default on/off state; the output file name.\\
+\code{src/musrPrimaryGeneratorAction.cc}, \code{...Messenger.cc} & Every \code{/gun/} command: vertex, momentum, spin, TURTLE, GPS switch-over, EcoMug and CRY.\\
+\code{src/musrScintSD.cc} & What a hit is and how \code{det_...} values are computed; hit merging and event selection.\\
+\code{src/musrSteppingAction.cc}, \code{musrEventAction.cc} & Per-step and per-event logic: \code{kill}/\code{shield} volumes, \code{save} planes, run-time limits, the \code{.stop} file.\\
+\code{src/musrDetectorMessenger.cc} & \code{/musr/run/...}: random-number options.\\
+\code{src/F04*.cc}, \code{musrTabulatedElementField.cc} & Field elements, field maps and integration accuracy.\\
+\code{include/EcoMug.h}, \code{src_cry/} & The cosmic-ray generator libraries.\\
+\bottomrule
+\end{tabularx}}
+
+\begin{keypoint}
+The pattern to internalise: a \code{/musr/command X} line is parsed by a long \code{if/else if (strcmp(...,"X")==0)} chain in \code{musrDetectorConstruction.cc} (or \code{musrPhysicsList.cc} for \code{process}), and a ROOT branch is declared once in \code{musrRootOutput.cc}. Those files, searched with \code{grep}, are the definitive reference for this toolkit.
+\end{keypoint}
+
+\section{Validation habits}
+Simulated numbers are only as good as your scepticism. Four cheap checks catch most mistakes.
+\begin{enumerate}
+  \item \textbf{Look at the geometry} before any physics run, and confirm every overlap check says \code{OK}.
+  \item \textbf{Run a known case.} A \(\mu^+\) lifetime fit must return \SI{2.197}{\micro s}; a field you set must come back out of a precession fit (Chapter~\ref{ch:capstone}). If a calibration you understand is wrong, stop.
+  \item \textbf{Check counts and sentinels.} Compare the number of stored events, the \code{det_n} distribution and the fraction of \(-1000\) values against expectation before trusting a spectrum.
+  \item \textbf{Vary one thing.} Change the field, the momentum or the geometry by a known amount and confirm the result moves the way physics says it should.
+\end{enumerate}
+
+\begin{recap}
+\begin{itemize}
+  \item Most failures are environment, a missing \code{data/}, a missing physics block, geometry overlaps, or uncut sentinels.
+  \item A rejected command means grep the source or ask the executable --- never guess.
+  \item \code{musrDetectorConstruction.cc}, \code{musrPhysicsList.cc} and \code{musrRootOutput.cc} are the real reference.
+  \item Validate with a known lifetime and a known field before trusting anything new.
+\end{itemize}
+\end{recap}
+\nextchap{reference appendices}

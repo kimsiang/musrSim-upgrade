@@ -1,0 +1,102 @@
+\chapter{The big picture: what \musrSim\ is}
+\label{ch:big}
+
+\begin{willdo}
+\begin{itemize}
+  \item See where \musrSim\ sits on top of Geant4, and why that matters.
+  \item Understand the ``configure in text, run once'' philosophy that shapes everything else.
+  \item Walk through the life of a single simulated event, from a command to a number on disk.
+  \item Meet the muon physics that makes this toolkit special.
+\end{itemize}
+\end{willdo}
+
+A muon detector is expensive, slow to build, and unforgiving of mistakes. A simulation is none of those things. Before you cut a single scintillator or book a beamline shift, you can build the whole apparatus in software, fire millions of muons at it, and read out exactly what each counter would see. That is what \musrSim\ is for. This chapter is the map; the rest of the book is the territory.
+
+\section{Geant4, in one paragraph}
+Geant4 (``GEometry ANd Tracking'') is a Monte-Carlo toolkit for simulating how particles move through matter. It is developed by an international collaboration --- CERN, KEK, SLAC and many universities --- and is the standard tool across particle, nuclear, medical and space physics. Given a geometry, a set of physics processes and some primary particles, Geant4 transports each particle step by step, deciding at every step whether it scatters, loses energy, decays or creates secondaries, and records what happens.
+
+\begin{hood}
+Geant4 is a C++ \emph{library}, not a program. Normally you write C++ classes for your detector, your primary particles and your run logic, compile them against Geant4, and run the result. \musrSim\ is one such program --- written once, so that you don't have to.
+\end{hood}
+
+\section{What \musrSim\ adds}
+\musrSim\ is a Geant4 application originally written at PSI by K.~Sedlak and colleagues for muon-spin-rotation (\muSR) instruments and beamlines, and since forked and extended by many groups. Its central design choice is this: \emph{you should not have to write or compile C++ to run a new experiment.} The detector geometry, the muon beam, the physics processes and the output are all defined in a plain-text \emph{macro} file. One compiled executable serves every setup.
+
+\begin{keypoint}
+\musrSim\ is not a separate simulation engine. It \emph{is} Geant4, pre-wrapped with muon physics and a text-driven geometry builder. Everything you learn here is transferable Geant4 knowledge; \musrSim\ just spares you the boilerplate.
+\end{keypoint}
+
+Concretely, \musrSim\ gives you:
+\begin{itemize}
+  \item a library of ready-made solids you place from the macro (\code{box}, \code{tubs}, \code{cons}, \code{sphere}, and many composite shapes for real spectrometers);
+  \item a muon-tuned physics list whose electromagnetic processes you switch on line by line, with muon decay \emph{with spin}, muonium formation and \(\mu^-\) capture available;
+  \item a muon-beam generator (\code{/gun/...}) that models beam position, momentum spread, tilt and --- crucially for \muSR\ --- spin polarisation, plus built-in cosmic-ray generators (EcoMug, CRY) for muography;
+  \item a ROOT output tree with one row per event.
+\end{itemize}
+
+\section{The three layers}
+It helps to picture three layers stacked on top of each other. You write the top layer; the bottom two do the work.
+
+\begin{center}
+\begin{tikzpicture}[layer/.style={draw=#1,fill=icebg,rounded corners=2pt,minimum width=95mm,minimum height=12mm,align=left,text width=88mm,font=\sffamily\scriptsize,text=muted}]
+  \node[layer=eblue] (m) {{\small\bfseries\color{navy}Your macro}\enspace{\ttfamily\color{navy}(run/first\_sim.mac)}\\Geometry, beam, physics processes, output --- as text commands.};
+  \node[layer=cyan,fill=cyanbg,below=5mm of m] (e) {{\small\bfseries\color{navy}musrSim}\enspace{\ttfamily\color{navy}(the executable)}\\Reads your commands; builds volumes, the physics list and the beam.};
+  \node[layer=navy,fill=white,below=5mm of e] (g) {{\small\bfseries\color{navy}Geant4 + ROOT}\enspace{\ttfamily\color{navy}(the engine)}\\Transports every particle, applies physics, and writes the \texttt{t1} tree.};
+  \draw[arr] (m)--(e); \draw[arr] (e)--(g);
+\end{tikzpicture}
+\end{center}
+
+When you run \code{../musrSim first_sim.mac}, the executable builds the geometry and physics from your macro, then executes the macro's remaining commands --- the beam settings and finally \code{/run/beamOn}, which hands control to Geant4 to simulate the events and fill the ROOT file. You never touch the bottom two layers, but knowing they are there tells you where to look when something behaves oddly.
+
+\section{The life of one event}
+Every simulation, no matter how elaborate, follows the same loop. Fixing this picture in your head now will make Chapters~\ref{ch:macro}--\ref{ch:output} feel like variations on a theme rather than a pile of new commands.
+
+\begin{center}
+\begin{tikzpicture}[node distance=6mm and 9mm]
+  \node[box] (cfg) {\textbf{Configure}\\geometry, physics,\\beam, output};
+  \node[box,right=of cfg] (on) {\texttt{/run/beamOn N}};
+  \node[hot,right=of on] (gen) {\textbf{Generate}\\one primary};
+  \node[hot,below=of gen] (trk) {\textbf{Track}\\step by step};
+  \node[hot,left=of trk] (hit) {\textbf{Hits}\\in sensitive\\volumes};
+  \node[box,left=of hit] (fill) {\textbf{Fill}\\one row of \texttt{t1}};
+  \node[box,below=of fill] (wr) {\textbf{Write}\\\texttt{data/*.root}};
+  \draw[arr] (cfg)--(on); \draw[arr] (on)--(gen); \draw[arr] (gen)--(trk);
+  \draw[arr] (trk)--(hit); \draw[arr] (hit)--(fill);
+  \draw[arr] (fill.north) -- ++(0,4mm) -| node[pos=0.25,above,font=\sffamily\scriptsize,text=muted]{next event (repeat \(N\) times)} ([xshift=-4mm]gen.south) ;
+  \draw[arr] (fill)--node[right,font=\sffamily\scriptsize,text=muted]{after event \(N\)}(wr);
+\end{tikzpicture}
+\end{center}
+
+\begin{keypoint}
+An \emph{event} in \musrSim\ is one primary particle (or, for CRY, one cosmic-ray shower) generated and tracked until it and all its secondaries leave the world or stop, with every energy deposit in a sensitive volume recorded as a \emph{hit}. One stored event becomes one row in the output tree.
+\end{keypoint}
+
+\begin{pitfall}
+Unlike bare Geant4 tutorials, \musrSim\ macros do \emph{not} call \code{/run/initialize}. The executable initialises Geant4 itself, before your macro's commands are executed (Section~\ref{sec:tworeads} explains how). If you copied \code{/run/initialize} from a generic Geant4 example, remove it.
+\end{pitfall}
+
+\section{Why muons, and why this toolkit}
+Muons are heavy cousins of the electron (\(m_\mu\approx207\,m_e\)), created abundantly in cosmic-ray showers and at accelerator beamlines. Two properties make them uniquely useful, and \musrSim\ is built around both.
+
+\begin{physics}
+\textbf{Muons barely notice matter.} A minimum-ionising muon loses only about \SI{2}{MeV} per \si{g.cm^{-2}}, so it punches through metres of rock or metal in a nearly straight line. This is what makes muon radiography (``muography'') possible --- and what lets a few scintillator slabs act as a cosmic-ray telescope.
+\end{physics}
+
+\begin{physics}
+\textbf{Muons carry a spin you can read.} A polarised muon's spin precesses in a magnetic field, and its direction is imprinted on the direction of the decay positron (\(\mu^+\to e^+\nu_e\bar\nu_\mu\)). Measuring where the positron goes measures the field the muon sat in --- the basis of \muSR. This is why \musrSim\ tracks muon polarisation (the \code{/gun/muonPolariz...} commands and the \code{muDecayPol...} branches) when most toolkits ignore spin entirely.
+\end{physics}
+
+The muon's mean lifetime, \(\tau_\mu=\SI{2.197}{\micro s}\), is short enough to measure on a benchtop and long enough that a stopped muon lives well past the prompt flash --- a fact we exploit in Chapters~\ref{ch:python} and~\ref{ch:capstone}.
+
+\section{What you will build in this book}
+By Chapter~\ref{ch:capstone} you will have written, run and analysed a complete transverse-field \muSR\ measurement: polarised muons stopping in a copper sample inside a \SI{10}{mT} field, their spins precessing, and two positron counters recording an oscillating asymmetry. Fitting it recovers the field you set --- in our reference run, \SI{9.983(15)}{mT} --- end to end, from a text file to a physics result.
+
+\begin{recap}
+\begin{itemize}
+  \item \musrSim\ is a text-driven Geant4 application; you configure in a macro and never compile.
+  \item Three layers: your macro \(\rightarrow\) \musrSim\ \(\rightarrow\) Geant4/ROOT.
+  \item Every event follows the same loop: generate \(\rightarrow\) track \(\rightarrow\) hits \(\rightarrow\) one tree row.
+  \item \musrSim\ exists because muons are penetrating and spin-polarised --- it tracks both.
+\end{itemize}
+\end{recap}
+\nextchap{install \musrSim\ and see first light}

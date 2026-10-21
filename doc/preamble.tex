@@ -1,0 +1,147 @@
+% ======================================================================
+%  preamble.tex -- layout, fonts, colours, callouts and code listings
+%  for the musrSim tutorial.  Compile the main file with xelatex.
+% ======================================================================
+\PassOptionsToPackage{obeyspaces,spaces}{url}
+\usepackage[a4paper,top=27mm,bottom=27mm,left=24mm,right=24mm,headsep=9mm]{geometry}
+\usepackage{fontspec}
+\usepackage{unicode-math}
+\setmainfont{Latin Modern Roman}
+\setsansfont{TeX Gyre Heros}
+\setmonofont{DejaVu Sans Mono}[Scale=0.84]
+\setmathfont{Latin Modern Math}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs,tabularx,array,longtable}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,fit,shapes.geometric,decorations.pathmorphing}
+\usepackage[most]{tcolorbox}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{siunitx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+\usepackage{xurl}
+\usepackage{bookmark}
+
+% ---------------- colours (one accent family) ----------------
+\definecolor{navy}{HTML}{051C2C}
+\definecolor{eblue}{HTML}{2251FF}
+\definecolor{cyan}{HTML}{00A9F4}
+\definecolor{royal}{HTML}{0341B3}
+\definecolor{ink}{HTML}{1B2A38}
+\definecolor{muted}{HTML}{5B6B7A}
+\definecolor{rule}{HTML}{C9D3DD}
+\definecolor{paleblue}{HTML}{EEF3FF}
+\definecolor{icebg}{HTML}{F4F8FB}
+\definecolor{cyanbg}{HTML}{E8F6FD}
+\definecolor{pitred}{HTML}{C7362F}
+\definecolor{pitbg}{HTML}{FBECEB}
+\definecolor{tipgreen}{HTML}{1F8A53}
+\definecolor{amber}{HTML}{B86E00}
+\definecolor{newbg}{HTML}{EAF7EF}
+\color{ink}
+
+% ---------------- text basics ----------------
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\setlength{\emergencystretch}{1.5em}
+\linespread{1.06}
+\setlist{itemsep=0.25em,topsep=0.3em}
+\urlstyle{tt}
+\newcommand{\musrSim}{\texttt{musrSim}}
+\newcommand{\eyebrow}[1]{{\sffamily\bfseries\footnotesize\color{eblue}\MakeUppercase{#1}}\par\nopagebreak[4]\vspace{0.2em}}
+\newcommand{\muSR}{\(\mu\)SR}
+\newcommand{\Gfour}{Geant4}
+% \code{...}: monospace that tolerates _ and breaks after / and _
+\DeclareUrlCommand\code{\urlstyle{tt}}
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\do\_\do\-}
+\makeatother
+\Urlmuskip=0mu plus 1mu
+
+% ---------------- headings ----------------
+\titleformat{\chapter}[display]
+  {\normalfont\color{rule}\titlerule[0.6pt]\vspace{1.6em}\raggedright\color{navy}\hyphenpenalty=10000}
+  {\fontsize{40}{44}\selectfont\bfseries \chaptertitlename\ \thechapter}
+  {1.0em}
+  {\fontsize{25}{30}\selectfont\bfseries}
+\titlespacing*{\chapter}{0pt}{0pt}{1.6em}
+\titleformat{\section}
+  {\sffamily\Large\bfseries\color{navy}\raggedright}{\color{eblue}\thesection}{0.6em}{}
+\titleformat{\subsection}
+  {\sffamily\large\bfseries\color{navy}\raggedright}{\color{eblue}\thesubsection}{0.6em}{}
+\titlespacing*{\section}{0pt}{1.5em}{0.5em}
+\titlespacing*{\subsection}{0pt}{1.1em}{0.35em}
+
+% ---------------- running header ----------------
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\chaptermark}[1]{\markboth{\chaptername\ \thechapter\quad #1}{}}
+\fancyhead[L]{\sffamily\scriptsize\color{muted}\musrSim\ \textperiodcentered\ TDLI Muon Physics Group}
+\fancyhead[R]{\sffamily\scriptsize\color{muted}\leftmark}
+\fancyfoot[C]{\sffamily\footnotesize\color{muted}\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{{\color{rule}\hrule width\headwidth height\headrulewidth}}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\sffamily\footnotesize\color{muted}\thepage}\renewcommand{\headrulewidth}{0pt}}
+
+% ---------------- callouts ----------------
+\tcbset{
+  mybase/.style={enhanced,breakable,arc=0pt,outer arc=0pt,boxrule=0.5pt,
+    left=10pt,right=10pt,top=7pt,bottom=7pt,before skip=0.9em,after skip=0.9em,
+    fonttitle=\sffamily\bfseries\scriptsize,coltitle=#1,attach title to upper,
+    after title={\par\vspace{0.35em}}},
+}
+\newtcolorbox{keypoint}{mybase=eblue,colback=paleblue,colframe=eblue,
+  title={\tikz[baseline=(t.base)]\node[fill=eblue,rounded corners=4pt,inner xsep=6pt,inner ysep=2.2pt,text=white,font=\sffamily\bfseries\scriptsize](t){KEY POINT};}}
+\newtcolorbox{tip}{mybase=tipgreen,colback=icebg,colframe=rule,title={TIP}}
+\newtcolorbox{pitfall}{mybase=pitred,colback=pitbg,colframe=pitbg,borderline west={3pt}{0pt}{pitred},title={COMMON PITFALL}}
+\newtcolorbox{physics}{mybase=royal,colback=cyanbg,colframe=cyanbg,borderline west={3pt}{0pt}{cyan},title={PHYSICS INTUITION}}
+\newtcolorbox{hood}{mybase=muted,colback=icebg,colframe=rule,title={UNDER THE HOOD}}
+\newtcolorbox{checkbuild}{mybase=amber,colback=icebg,colframe=rule,title={CHECK YOUR BUILD}}
+\newtcolorbox{newin}{mybase=tipgreen,colback=newbg,colframe=newbg,borderline west={3pt}{0pt}{tipgreen},title={NEW IN THIS EDITION}}
+\newtcolorbox{recap}{mybase=eblue,colback=icebg,colframe=rule,title={RECAP}}
+\newtcolorbox{willdo}{mybase=eblue,colback=icebg,colframe=rule,title={IN THIS CHAPTER YOU WILL}}
+\newcommand{\nextchap}[1]{\par\vspace{1.2em}{\raggedleft\sffamily\bfseries\small\color{eblue}Next: #1\enspace\(\rightarrow\)\par}}
+
+% ---------------- code listings ----------------
+\captionsetup[lstlisting]{font={small},labelfont={small},skip=4pt}
+\renewcommand{\lstlistingname}{Listing}
+\lstdefinestyle{base}{
+  basicstyle=\ttfamily\footnotesize\color{ink},
+  backgroundcolor=\color{icebg},
+  frame=leftline,framerule=2.2pt,rulecolor=\color{eblue},
+  xleftmargin=8pt,framexleftmargin=6pt,framesep=0pt,
+  aboveskip=0.9em,belowskip=0.7em,
+  columns=fullflexible,keepspaces=true,showstringspaces=false,
+  breaklines=true,breakatwhitespace=false,
+  postbreak=\mbox{\textcolor{muted}{\(\hookrightarrow\)}\space},breakindent=1.5em,
+  commentstyle=\color{muted}\itshape,
+  keywordstyle=\color{royal}\bfseries,
+  stringstyle=\color{tipgreen},
+  upquote=true,literate={~}{\textasciitilde}1,
+}
+\lstdefinelanguage{g4mac}{morecomment=[l]{\#},sensitive=true}
+\lstdefinestyle{mac}{style=base,language=g4mac}
+\lstdefinestyle{sh}{style=base,language=bash,morekeywords={cmake,make,mkdir,cd,source,export,git,hadd,pip,conda,micromamba,root,grep,ls,cp,python}}
+\lstdefinestyle{py}{style=base,language=Python}
+\lstdefinestyle{cpp}{style=base,language=C++}
+\lstdefinestyle{plain}{style=base}
+\lstset{style=base}
+
+% ---------------- tables ----------------
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+\newcommand{\tablestyle}{\small\renewcommand{\arraystretch}{1.25}\arrayrulecolor{rule}}
+\usepackage{colortbl}
+
+% ---------------- tikz styles ----------------
+\tikzset{
+  box/.style={draw=rule,fill=icebg,rounded corners=2pt,align=center,font=\sffamily\scriptsize,
+    minimum height=11mm,minimum width=24mm,text=navy},
+  hot/.style={box,draw=cyan,fill=cyanbg},
+  arr/.style={-{Stealth[length=2.2mm]},eblue,line width=0.6pt},
+}

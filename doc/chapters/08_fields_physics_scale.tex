@@ -1,0 +1,179 @@
+\chapter{Fields, physics, and running at scale}
+\label{ch:fields}
+
+\begin{willdo}
+\begin{itemize}
+  \item Add magnetic and electric fields --- uniform, mapped from a file, and quadrupole.
+  \item Understand exactly which physics your run contains, and how to change it.
+  \item Enable optical-photon tracking, and know what it costs.
+  \item Split a large simulation across many jobs with statistically independent random numbers.
+\end{itemize}
+\end{willdo}
+
+This chapter collects the capabilities you reach for once the basics work: fields (essential for real \muSR), the physics list, optical photons, and the mechanics of large production runs.
+
+\section{Magnetic and electric fields}
+Fields are added with the \code{globalfield} command family and attached to a logical volume. Fields from several elements may overlap; \musrSim\ sums them.
+
+\textbf{Uniform field.} Give the half-dimensions of the box the field fills, the keyword \code{uniform}, the box centre, the host logical volume, then \emph{six} numbers: \(B_x\,B_y\,B_z\) in tesla and \(E_x\,E_y\,E_z\) in kV/mm.
+
+\begin{lstlisting}[style=mac,caption={A uniform \SI{10}{mT} field along $x$, over a \SI{800}{mm} cube at the origin}]
+# globalfield <name> <halfX halfY halfZ> uniform <x y z> <logVol> <Bx By Bz> <Ex Ey Ez>
+/musr/command globalfield TF 400 400 400 uniform 0 0 0 log_World 0.01 0 0 0 0 0
+\end{lstlisting}
+
+\begin{pitfall}
+Always give all six field components, even when \(E=0\). The parser reads exactly six numbers; leaving the electric part off leaves those values undefined.
+\end{pitfall}
+
+\textbf{Field map.} A mapped field reads a table from a file and scales it, as the GPD solenoid does in \code{201.mac}. The first three numbers are the map's centre; then \code{fromfile}, the table format, the file, the host volume and the field value in tesla:
+
+\begin{lstlisting}[style=mac,caption={A solenoid field from a 2-D field map (from \texttt{201.mac})}]
+# globalfield <name> <x y z> fromfile <format> <tablefile> <logVol> <value[T]> [<final> <nSteps>]
+/musr/command globalfield centralSolenoidField 0. 0. 0. fromfile 2D GPD_coil_primitive.table log_target 0.03
+\end{lstlisting}
+
+The format names the table layout: \code{2D} or \code{3D} (OPERA-style tables), \code{2DB}/\code{2DE} and \code{3DB}/\code{3DE} (magnetic/electric maps in the PSI format), plus a few specialised variants listed in \code{musrTabulatedElementField.cc}. Supplying the two optional trailing numbers --- a final value and a number of steps --- ramps the field linearly with event number, a compact way to simulate a field scan in a single run.
+
+\textbf{Quadrupole.} \code{globalfield <name> <x y z> quadrupole <halfLength> <radius> <fringeFactor> <logVol> <gradient[T/m]>} builds a magnetic quadrupole with fringe fields.
+
+Check what you built, and tune the integration accuracy if needed:
+
+\begin{lstlisting}[style=mac,caption={Verifying the field and tuning the stepping accuracy}]
+/musr/command globalfield printFieldValueAtPoint 0 0 0
+/musr/command globalfield printparameters
+/musr/command globalfield setparameter SetLargestAcceptableStep 200
+/musr/command globalfield setparameter SetMinimumEpsilonStep 5e-5
+/musr/command globalfield setparameter SetMaximumEpsilonStep 0.001
+/musr/command globalfield setparameter SetDeltaOneStep 0.1
+\end{lstlisting}
+
+\code{printFieldValueAtPoint} prints, just before the first event, a line such as\\
+\code{Field at (0.00, 0.00, 0.00) mm is:  B = (0.01, 0, 0) T,  E = (0, 0, 0) kV/mm}.
+
+\begin{checkbuild}
+Always print the field at a few points after defining a mapped field. A map with the wrong axis convention, units or centre offset is the most common silent error in field work, and the printout catches it in seconds. Note also that Geant4~11 refuses a maximum epsilon step above 0.01; \musrSim\ now lowers larger values to 0.01 and tells you so.
+\end{checkbuild}
+
+\begin{keypoint}
+In a field, \musrSim\ transports the muon spin along with its trajectory --- and keeps precessing it after the muon stops. The recorded \code{muDecayPol...} reflects all the precession the muon underwent, so a transverse field produces the oscillating asymmetry you will build in Chapter~\ref{ch:capstone}.
+\end{keypoint}
+
+\section{The physics list, exactly}
+\label{sec:physics}
+\musrSim\ always uses its own physics list, \code{musrPhysicsList}. Most of it is assembled from your macro (Section~\ref{sec:physicsblock}); a few pieces are fixed in C++:
+
+{\tablestyle
+\begin{tabularx}{\textwidth}{@{}>{\raggedright\arraybackslash}p{0.3\textwidth} L@{}}
+\toprule
+\textbf{Always present} & \textbf{From your macro (\code{/musr/command process ...})}\\
+\midrule
+Transportation; muon decay \emph{with spin} (\code{G4DecayWithSpin}) for \(\mu^\pm\); multiple scattering and ionisation for other charged hadrons and ions; muonium (\code{Mu}) scattering and decay; radioactive decay for ions when GPS is used. &
+\textbf{addProcess} (particle, process, three ordering numbers): \code{G4eMultipleScattering}, \code{G4eIonisation}, \code{G4eBremsstrahlung}, \code{G4eplusAnnihilation}, \code{G4MuMultipleScattering}, \code{G4MuIonisation}, \code{G4MuBremsstrahlung}, \code{G4MuPairProduction}, \code{musrMuFormation}, \code{musrMuEnergyLossLandau}, \code{G4MuonMinusCapture}, \code{G4Scintillation}, \code{G4Cerenkov}, \code{G4StepLimiter}, \code{G4UserSpecialCuts}.\newline
+\textbf{addDiscreteProcess}: \code{G4PhotoElectricEffect}, \code{G4ComptonScattering}, \code{G4GammaConversion}, \code{G4GammaConversionToMuons}, \code{G4RayleighScattering}, \code{G4CoulombScattering}, \code{G4OpAbsorption}, \code{G4OpRayleigh}, \code{G4OpBoundaryProcess}, \code{G4OpWLS}.\\
+\bottomrule
+\end{tabularx}}
+
+Production cuts default to \SI{0.1}{mm} for photons and electrons and can be changed with \code{/musr/command process cutForGamma <mm>} and \code{cutForElectron <mm>}.
+
+Two consequences follow. First, \emph{there is no hadronic physics} for nucleons and pions beyond ionisation and scattering, and no photo- or electro-nuclear reactions: \musrSim\ is an electromagnetic-plus-muon toolkit. If neutron or pion interactions matter to you, that is a C++ change. Second, every example macro's \code{process} block is meaningful: it is your physics.
+
+\begin{pitfall}
+An unknown process name stops the run with \code{not implemented in musrPhysicsList.cc}. Older macros sometimes name processes that were never wired in; add the one line to \code{musrPhysicsList::ConstructEM()} --- this edition added \code{G4GammaConversionToMuons} exactly that way --- or remove the line. (\code{/musr/command G4EmExtraPhysics} is still accepted for compatibility, but does nothing.)
+\end{pitfall}
+
+For \(\mu^+\) stopping in matter, muonium formation can be modelled with \code{musrMuFormation}; for \(\mu^-\), add \code{G4MuonMinusCapture} as an at-rest process:
+
+\begin{lstlisting}[style=mac,caption={Negative-muon capture at rest}]
+/musr/command process addProcess mu- G4MuonMinusCapture 0 -1 -1
+\end{lstlisting}
+
+\section{Optical photons}
+\label{sec:optical}
+For studies of light yield and photodetector timing you can track individual scintillation and Cherenkov photons. It is off by default because it is expensive. Turning it on takes four ingredients, all in the macro; \code{run/110.mac} is a complete working example.
+
+\begin{enumerate}
+  \item \code{/musr/command G4OpticalPhotons true}.
+  \item Optical properties for each material photons travel in --- a named \code{materialPropertiesTable}, attached with \code{setMaterialPropertiesTable}: refractive index, absorption length, emission spectrum, yield, time constants.
+  \item The optical processes: \code{G4Scintillation} (and/or \code{G4Cerenkov}) for the charged particles, and \code{G4OpAbsorption}, \code{G4OpRayleigh}, \code{G4OpBoundaryProcess} for \code{opticalphoton}.
+  \item Optical surfaces (\code{opticalSurface}) with an \code{EFFICIENCY} where photons are detected, e.g. a scintillator--APD boundary.
+\end{enumerate}
+
+\begin{lstlisting}[style=mac,caption={Optical properties of a plastic scintillator (shortened from \texttt{110.mac}; photon energies in MeV)}]
+/musr/command G4OpticalPhotons true
+/musr/command materialPropertiesTable optScintMPT RINDEX 2  2.695e-6 3.64618e-6  1.58 1.58
+/musr/command materialPropertiesTable optScintMPT SCINTILLATIONYIELD 0 9167.
+/musr/command materialPropertiesTable optScintMPT FASTTIMECONSTANT   0 1.32
+/musr/command materialPropertiesTable optScintMPT YIELDRATIO         0 1.0
+/musr/command setMaterialPropertiesTable optScintMPT G4_PLASTIC_SC_VINYLTOLUENE
+/musr/command process addProcess e- G4Scintillation 4 -1 4
+/musr/command process addDiscreteProcess opticalphoton G4OpAbsorption
+/musr/command process addDiscreteProcess opticalphoton G4OpBoundaryProcess
+\end{lstlisting}
+
+When active, the \code{odet_...} branches record photon counts and arrival times per optical detector, and the \code{OPSA} command family simulates the photodetector signal.
+
+\begin{checkbuild}
+Geant4~11 renamed the two-component scintillation properties (\code{FASTCOMPONENT} \(\rightarrow\) \code{SCINTILLATIONCOMPONENT1}, \code{FASTTIMECONSTANT} \(\rightarrow\) \code{SCINTILLATIONTIMECONSTANT1}, \code{YIELDRATIO} \(\rightarrow\) \code{SCINTILLATIONYIELD1/2}, and the \code{SLOW...} equivalents). \musrSim\ translates the old names automatically, so both spellings work in your macro.
+\end{checkbuild}
+
+\begin{pitfall}
+Optical photons can multiply the number of tracked particles per event by thousands, slowing a run by one to two orders of magnitude. Turn them on only for the detector study that needs them, keep the event count modest, and leave them off for geometry, beam and asymmetry work.
+\end{pitfall}
+
+\section{Running at scale}
+\label{sec:scale}
+Physics runs need millions of events, which means many jobs. Each job must use \emph{different random numbers} and write a \emph{differently named} file. The second is easy --- the second command-line argument sets the file suffix. The first needs care.
+
+\begin{keypoint}
+How the random engine is seeded is set by \code{/musr/run/randomOption}:
+\begin{itemize}
+  \item \code{0} (default) --- no seeding: every run of the same macro produces the \emph{same} events;
+  \item \code{1} --- seed from the clock \emph{plus} 100 \(\times\) the seed offset (third command-line argument or \code{SetRndSeedOffset});
+  \item \code{2} --- re-seed each event with its event number: perfectly reproducible, event by event, and therefore \emph{identical} across jobs;
+  \item \code{5} --- a fixed seed from \code{/musr/command SetRndSeed <n>} (fully reproducible run).
+\end{itemize}
+For independent parallel jobs use \textbf{option 1} with a different offset per job.
+\end{keypoint}
+
+We tested this directly: two 300-event jobs of \code{first_sim.mac} with seed offsets 1 and 2 produced \emph{identical} muon decay times under options 0 and 2, and different ones under option 1.
+
+\begin{lstlisting}[style=mac,caption={Settings for production jobs}]
+/musr/run/randomOption 1
+/musr/run/howOftenToPrintEvent 10000
+# wall-clock guard in seconds: stop the run cleanly before the batch limit
+/musr/command maximumRunTimeAllowed 82800
+\end{lstlisting}
+
+\begin{lstlisting}[style=sh,caption={A simple job split, then merge with ROOT's \texttt{hadd}}]
+for i in $(seq 1 50); do
+  ../musrSim 201.mac job${i} ${i} > log_job${i}.txt 2>&1 &
+done
+wait
+# outputs: data/musrSim_jp201_job1.root ... data/musrSim_jp201_job50.root
+hadd data/musrSim_jp201_merged.root data/musrSim_jp201_job*.root
+\end{lstlisting}
+
+On an HTCondor farm the same idea becomes a submit file with \code{Queue 50}, passing \code{$(Process)} as both the name suffix and the seed offset.
+
+\begin{pitfall}
+Option~1 seeds from the clock, so a job is not reproducible after the fact unless you note its seeds: they are printed at the start of the log (\code{seed1: ...; seed2: ...}). Keep the logs. If you need bit-exact reproducibility of a single job, use option~5 with an explicit \code{SetRndSeed} per job instead.
+\end{pitfall}
+
+\begin{tip}
+Two run-time safety valves. \code{maximumRunTimeAllowed} defaults to \SI{85000}{s} (about 23.6 hours): a longer job stops itself there, writing what it has --- raise it for multi-day runs. And to stop a running job gracefully, create a file named after its macro with \code{.stop} instead of \code{.mac} (\code{touch 201.stop}): the run ends after the current event and the ROOT file is written normally.
+\end{tip}
+
+\begin{tip}
+Merge with \code{hadd} when you want a single ROOT file; for Python analysis you can skip the merge: \code{uproot.concatenate("data/musrSim_jp201_job*.root:t1", ...)} reads the whole set directly.
+\end{tip}
+
+\begin{recap}
+\begin{itemize}
+  \item \code{globalfield ... uniform} needs six field numbers; \code{... fromfile <format>} reads a map; always \code{printFieldValueAtPoint}.
+  \item \code{musrPhysicsList} is the only physics list; your \code{process} lines are your EM physics; there is no hadronic physics.
+  \item \code{G4OpticalPhotons true} plus material tables, processes and surfaces enables photon tracking --- at a large speed cost.
+  \item Parallel jobs need \code{randomOption 1} and a different seed offset each; merge with \code{hadd} or read all files in \code{uproot}.
+\end{itemize}
+\end{recap}
+\nextchap{a complete \muSR\ asymmetry measurement}
