@@ -1,0 +1,54 @@
+# ---------------------------------------------------------------
+# first_sim.mac : a muon beam into a single scintillator slab
+# (musrSim tutorial, Chapter 3)
+# Default units: mm, ns, MeV, MeV/c, tesla, degree
+# ---------------------------------------------------------------
+
+# ---- GEOMETRY ----
+# construct <solid> <name> <half-x half-y half-z> <material>
+#           <x y z> <motherLog> <rotation> <sensitivity> <volumeID>
+/musr/command construct box World 500 500 500 G4_AIR 0 0 0 no_logical_volume norot dead -1
+/musr/command construct box Slab 50 50 5 G4_PLASTIC_SC_VINYLTOLUENE 0 0 0 log_World norot musr/ScintSD 1
+
+# ---- APPEARANCE (only used if you visualise) ----
+/musr/command visattributes log_World invisible
+/musr/command visattributes log_Slab green
+
+# ---- PHYSICS: musrSim builds its EM physics from these lines ----
+/musr/command process addDiscreteProcess gamma G4PhotoElectricEffect
+/musr/command process addDiscreteProcess gamma G4ComptonScattering
+/musr/command process addDiscreteProcess gamma G4GammaConversion
+/musr/command process addDiscreteProcess gamma G4RayleighScattering
+/musr/command process addProcess  e-  G4eMultipleScattering   -1  1  1
+/musr/command process addProcess  e-  G4eIonisation           -1  2  2
+/musr/command process addProcess  e-  G4eBremsstrahlung       -1  3  3
+/musr/command process addProcess  e+  G4eMultipleScattering   -1  1  1
+/musr/command process addProcess  e+  G4eIonisation           -1  2  2
+/musr/command process addProcess  e+  G4eBremsstrahlung       -1  3  3
+/musr/command process addProcess  e+  G4eplusAnnihilation      0 -1  4
+/musr/command process addProcess  mu+ G4MuMultipleScattering  -1  1  1
+/musr/command process addProcess  mu+ G4MuIonisation          -1  2  2
+/musr/command process addProcess  mu+ G4MuBremsstrahlung      -1  3  3
+/musr/command process addProcess  mu+ G4MuPairProduction      -1  4  4
+/musr/command process addProcess  mu- G4MuMultipleScattering  -1  1  1
+/musr/command process addProcess  mu- G4MuIonisation          -1  2  2
+/musr/command process addProcess  mu- G4MuBremsstrahlung      -1  3  3
+/musr/command process addProcess  mu- G4MuPairProduction      -1  4  4
+
+# ---- OUTPUT ----
+# Write data/musrSim_jp000.root ; keep only events with a detector hit
+/musr/command SetOutputFileName DEFAULT
+/musr/command storeOnlyEventsWithHits true
+/musr/run/howOftenToPrintEvent 1000
+
+# ---- BEAM: surface muons along +z, spin pointing along -z ----
+/gun/primaryparticle mu+
+/gun/vertex 0 0 -100 mm
+/gun/vertexsigma 5 5 0 mm
+/gun/momentum 29.8 MeV
+/gun/muonPolarizVector 0 0 -1
+/gun/muonPolarizFraction 1
+/gun/decaytimelimits -1 -1 2197.03 ns
+
+# ---- GO ----
+/run/beamOn 20000

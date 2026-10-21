@@ -1,0 +1,61 @@
+# ---------------------------------------------------------------
+# tf_musr.mac : transverse-field muSR asymmetry
+# (musrSim tutorial, Chapter 9)
+# Units: mm, ns, MeV, MeV/c, tesla, degree
+# ---------------------------------------------------------------
+
+# ---- GEOMETRY ----
+/musr/command construct box World 400 400 400 G4_AIR 0 0 0 no_logical_volume norot dead -1
+# sample the muons stop in; the name "Target" fills the muTarget* branches
+/musr/command construct box Target 15 15 3 G4_Cu 0 0 0 log_World norot dead 5
+# two positron counters facing each other along +y and -y
+/musr/command construct box CounterU 40 3 40 G4_PLASTIC_SC_VINYLTOLUENE 0 45 0 log_World norot musr/ScintSD 11
+/musr/command construct box CounterD 40 3 40 G4_PLASTIC_SC_VINYLTOLUENE 0 -45 0 log_World norot musr/ScintSD 1
+
+/musr/command visattributes log_World invisible
+/musr/command visattributes log_Target blue
+/musr/command visattributes log_CounterU green
+/musr/command visattributes log_CounterD green
+
+# ---- TRANSVERSE FIELD: 10 mT along x, over the whole world ----
+# globalfield <name> <halfX halfY halfZ> uniform <x y z> <logVol> <Bx By Bz> <Ex Ey Ez>
+/musr/command globalfield TF 400 400 400 uniform 0 0 0 log_World 0.01 0 0 0 0 0
+/musr/command globalfield printFieldValueAtPoint 0 0 0
+
+# ---- PHYSICS: musrSim builds its EM physics from these lines ----
+/musr/command process addDiscreteProcess gamma G4PhotoElectricEffect
+/musr/command process addDiscreteProcess gamma G4ComptonScattering
+/musr/command process addDiscreteProcess gamma G4GammaConversion
+/musr/command process addDiscreteProcess gamma G4RayleighScattering
+/musr/command process addProcess  e-  G4eMultipleScattering   -1  1  1
+/musr/command process addProcess  e-  G4eIonisation           -1  2  2
+/musr/command process addProcess  e-  G4eBremsstrahlung       -1  3  3
+/musr/command process addProcess  e+  G4eMultipleScattering   -1  1  1
+/musr/command process addProcess  e+  G4eIonisation           -1  2  2
+/musr/command process addProcess  e+  G4eBremsstrahlung       -1  3  3
+/musr/command process addProcess  e+  G4eplusAnnihilation      0 -1  4
+/musr/command process addProcess  mu+ G4MuMultipleScattering  -1  1  1
+/musr/command process addProcess  mu+ G4MuIonisation          -1  2  2
+/musr/command process addProcess  mu+ G4MuBremsstrahlung      -1  3  3
+/musr/command process addProcess  mu+ G4MuPairProduction      -1  4  4
+/musr/command process addProcess  mu- G4MuMultipleScattering  -1  1  1
+/musr/command process addProcess  mu- G4MuIonisation          -1  2  2
+/musr/command process addProcess  mu- G4MuBremsstrahlung      -1  3  3
+/musr/command process addProcess  mu- G4MuPairProduction      -1  4  4
+
+# ---- OUTPUT ----
+/musr/command SetOutputFileName tf
+/musr/command storeOnlyEventsWithMuonsDecayedInDetID 5
+/musr/run/howOftenToPrintEvent 50000
+
+# ---- BEAM: surface muons along +z, spin anti-parallel (-z) ----
+/gun/primaryparticle mu+
+/gun/vertex 0 0 -80 mm
+/gun/vertexsigma 3 3 0 mm
+/gun/momentum 29.8 MeV
+/gun/muonPolarizVector 0 0 -1
+/gun/muonPolarizFraction 1
+/gun/decaytimelimits -1 -1 2197.03 ns
+
+# ---- GO ----
+/run/beamOn 200000
